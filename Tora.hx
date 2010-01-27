@@ -517,6 +517,20 @@ class Tora {
 		case "hosts":
 			for( h in hosts.keys() )
 				neko.Lib.println("Host '"+h+"', Root '"+hosts.get(h)+"'<br>");
+		case "share":
+			ModToraApi.shares_lock.acquire();
+			var bytes = neko.Lib.load("std","mem_size",1);
+			var total = 0;
+			for( s in ModToraApi.shares ) {
+				var c = s.owner;
+				var size = bytes(s.data);
+				total += size;
+				neko.Lib.print("Share '"+s.name+"' "+Math.ceil(size/1024)+" KB");
+				if( c != null ) neko.Lib.print(" locked by "+c.getURL());
+				neko.Lib.println("<br>");
+			}
+			neko.Lib.println("Total : "+Math.ceil(total/1024)+" KB<br>");
+			ModToraApi.shares_lock.release();
 		default:
 			throw "No such command '"+cmd+"'";
 		}

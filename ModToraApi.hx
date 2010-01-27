@@ -117,8 +117,8 @@ class ModToraApi extends ModNekoApi {
 
 	// shares
 
-	static var shares = new Hash<Share>();
-	static var shares_lock = new neko.vm.Mutex();
+	public static var shares = new Hash<Share>();
+	public static var shares_lock = new neko.vm.Mutex();
 
 	function share_init( name : neko.NativeString, ?make : Void -> Dynamic ) : Share {
 		var name = neko.NativeString.toString(name);
