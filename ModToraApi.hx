@@ -92,15 +92,20 @@ class ModToraApi extends ModNekoApi {
 		var url = neko.NativeString.toString(url);
 		var c = new NullClient(client.file,client.hostName,url);
 		if( delay != null ) {
-			if( result != null )
+			if( result != null ) {
+				var retryCount = 0;
 				c.onExecute = function() {
 					var data = c.buffer.toString();
 					if( data != neko.NativeString.toString(result) ) {
-						Tora.log("RETRY "+c.hostName+url);
+						retryCount++;
+						if( retryCount % 200 == 0 )
+							Tora.log("DOING "+retryCount+" RETRY "+c.hostName+url);
 						c.buffer = new StringBuf();
 						Tora.inst.delay(0.5,function() Tora.inst.clientQueue.push(c));
-					}
+					} else if( retryCount > 0 )
+						Tora.log("DID "+retryCount+" RETRY "+c.hostName+url);
 				};
+			}
 			Tora.inst.delay(delay,function() Tora.inst.clientQueue.push(c));
 			return null;
 		}
