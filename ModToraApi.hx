@@ -20,6 +20,7 @@ typedef Share = {
 	var data : Dynamic;
 	var lock : neko.vm.Mutex;
 	var owner : Client;
+	var free : Bool;
 }
 
 typedef Queue = {
@@ -140,6 +141,7 @@ class ModToraApi extends ModNekoApi {
 					data : try make() catch( e : Dynamic ) { shares_lock.release(); neko.Lib.rethrow(e); },
 					lock : new neko.vm.Mutex(),
 					owner : null,
+					free : false,
 				};
 				tmp.set(name,s);
 				shares = tmp;
@@ -151,6 +153,7 @@ class ModToraApi extends ModNekoApi {
 
 	function share_get( s : Share, lock : Bool ) {
 		if( lock && s.owner != client ) {
+			if( s.free ) throw neko.NativeString.ofString("Can't lock a share which have been free");
 			s.lock.acquire();
 			s.owner = client;
 			if( client.lockedShares == null )
@@ -172,8 +175,11 @@ class ModToraApi extends ModNekoApi {
 	}
 
 	function share_free( s : Share ) {
+		if( s.owner != client ) throw neko.NativeString.ofString("Can't free a not locked share");
+		if( s.free ) return;
 		shares_lock.acquire();
-		shares.remove(s.name);
+		shares.remove(s.name); // MT-safe
+		s.free = true;
 		shares_lock.release();
 	}
 
