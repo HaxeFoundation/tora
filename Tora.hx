@@ -451,7 +451,6 @@ class Tora {
 			if( client.lockedShares != null ) {
 				for( s in client.lockedShares ) {
 					s.owner = null;
-					Tora.log("RELEASE "+s.name);
 					s.lock.release();
 				}
 				client.lockedShares = null;
