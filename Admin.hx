@@ -152,6 +152,7 @@ class Admin {
 			"Hits : "+infos.recentHits+"/sec",
 			"Threads : "+busy+" / "+infos.threads.length,
 			"Queue size : "+infos.queue,
+			"Active connections : "+infos.activeConnections,
 			"Memory : "+(mem.heap - mem.free)+" / "+mem.heap+" "+memUnit,
 			"Total hits : "+infos.totalHits+" ("+fmt(infos.totalHits/infos.upTime)+"/sec)",
 			"Cache hits : "+cacheHits+" ("+fmt(cacheHits*100.0/infos.totalHits)+"%)",

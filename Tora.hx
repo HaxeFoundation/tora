@@ -41,15 +41,13 @@ typedef FileData = {
 
 class Tora {
 
-	static var STOP : Dynamic = {};
-	static var MODIFIED : Dynamic = {};
-
-	public var clientQueue : neko.vm.Deque<Client>;
-	var notifyQueue : neko.vm.Deque<Client>;
+	var clientQueue : neko.vm.Deque<Client>;
+	var pendingSocks : neko.vm.Deque<Client>;
 	var threads : Array<ThreadData>;
 	var startTime : Float;
 	var totalHits : Int;
 	var recentHits : Int;
+	var activeConnections : Int;
 	var files : Hash<FileData>;
 	var flock : neko.vm.Mutex;
 	var rootLoader : neko.vm.Loader;
@@ -77,7 +75,7 @@ class Tora {
 		tls = new neko.vm.Tls();
 		flock = new neko.vm.Mutex();
 		clientQueue = new neko.vm.Deque();
-		notifyQueue = new neko.vm.Deque();
+		pendingSocks = new neko.vm.Deque();
 		threads = new Array();
 		rootLoader = neko.vm.Loader.local();
 		modulePath = rootLoader.getPath();
@@ -93,7 +91,7 @@ class Tora {
 		enable_jit = neko.Lib.load("std","enable_jit",1);
 		jit = (enable_jit(null) == true);
 		neko.vm.Thread.create(callback(startup,nthreads));
-		neko.vm.Thread.create(notifyLoop);
+		neko.vm.Thread.create(socketsLoop);
 		neko.vm.Thread.create(speedDelayLoop);
 	}
 
@@ -162,14 +160,14 @@ class Tora {
 	}
 
 	// checking which listening clients are disconnected
-	function notifyLoop() {
+	function socketsLoop() {
 		var poll = new neko.net.Poll(4096);
 		var socks = new Array();
 		var changed = false;
 		while( true ) {
 			// add new clients
 			while( true ) {
-				var client = notifyQueue.pop(socks.length == 0);
+				var client = pendingSocks.pop(socks.length == 0);
 				if( client == null ) break;
 				changed = true;
 				// if we have a manually stopped client, then we close the socket
@@ -183,44 +181,55 @@ class Tora {
 			}
 			if( changed ) {
 				poll.prepare(socks,new Array());
+				activeConnections = socks.length;
 				changed = false;
 			}
-			// check if some clients have been disconnected
-			poll.events(1.0);
+			// check if some clients sent a message or have been disconnected
+			poll.events(0.05);
 			var i = 0;
-			var toremove = null;
+			var toact = null;
 			while( true ) {
 				var idx = poll.readIndexes[i++];
 				if( idx == -1 ) break;
 				var client : Client = socks[idx].custom;
-				if( toremove == null ) toremove = new List();
-				toremove.add(client);
+				if( toact == null ) toact = new List();
+				toact.add(client);
 			}
-			// remove disconnected clients from socket list
-			// and process corresponding events
-			if( toremove != null ) {
-				for( c in toremove ) {
+			if( toact != null ) {
+				for( c in toact ) {
 					socks.remove(c.sock);
-					var q = c.notifyQueue;
-					q.lock.acquire();
-					if( !q.clients.remove(c) ) {
-						q.lock.release();
-						continue;
+					try {
+						c.cachedCode = c.sock.input.readByte();
+						c.prepare();
+						handleRequest(c);
+					} catch( e : Dynamic ) {
+						disconnectClient(c);
+						c.sock.close();
 					}
-					if( c.onStop != null )
-						c.onStop();
-					c.onNotify = null;
-					c.onStop = null;
-					q.lock.release();
-					var api = c.notifyApi;
-					api.lock.acquire();
-					api.listening.remove(c);
-					api.lock.release();
-					c.sock.close();
 				}
 				changed = true;
 			}
 		}
+	}
+
+	function disconnectClient( c : Client ) {
+		var q = c.notifyQueue;
+		if( q == null )
+			return;
+		q.lock.acquire();
+		if( !q.clients.remove(c) ) {
+			q.lock.release();
+			return;
+		}
+		if( c.onStop != null )
+			try c.onStop() catch( e : Dynamic ) log(Std.string(e));
+		c.onNotify = null;
+		c.onStop = null;
+		q.lock.release();
+		var api = c.notifyApi;
+		api.lock.acquire();
+		api.listening.remove(c);
+		api.lock.release();
 	}
 
 	function initLoader( api : ModToraApi ) {
@@ -284,12 +293,11 @@ class Tora {
 			api.client = c;
 			try {
 				c.sendMessage(CExecute,"");
-				notifyQueue.add(c);
+				pendingSocks.add(c);
 			} catch( e : Dynamic ) {
 				// socket will be closed soon anyway
 			}
 			q.lock.release();
-			notifyQueue.add(c);
 		}
 		api.client = null;
 	}
@@ -300,7 +308,7 @@ class Tora {
 			// if the client has been stopped, tell the notifyLoop so it can close the socket
 			if( c.onNotify == null ) {
 				c.sendMessage(tora.Code.CExecute,"");
-				notifyQueue.add(c);
+				pendingSocks.add(c);
 			}
 		} catch( e : Dynamic ) {
 			var data = try {
@@ -356,6 +364,7 @@ class Tora {
 			}
 			// check if we need to do something
 			if( !client.execute ) {
+				disconnectClient(client);
 				client.sock.close();
 				t.client = null;
 				continue;
@@ -439,15 +448,18 @@ class Tora {
 			// cleanup
 			redirect(null);
 			t.client = null;
-			if( client.lockedShares != null )
+			if( client.lockedShares != null ) {
 				for( s in client.lockedShares ) {
 					s.owner = null;
+					Tora.log("RELEASE "+s.name);
 					s.lock.release();
 				}
-			if( client.onNotify != null ) {
+				client.lockedShares = null;
+			}
+			if( client.notifyQueue != null ) {
 				// start monitoring the socket
 				client.uri = "<"+client.notifyQueue.name+">";
-				notifyQueue.add(client);
+				pendingSocks.add(client);
 			} else
 				client.sock.close();
 		}
@@ -465,8 +477,7 @@ class Tora {
 		try {
 			while( running ) {
 				var sock = s.accept();
-				totalHits++;
-				clientQueue.add(new Client(sock,secure));
+				handleRequest(new Client(sock,secure));
 			}
 		} catch( e : Dynamic ) {
 			log("accept() failure : maybe too much FD opened ?");
@@ -563,12 +574,22 @@ class Tora {
 			};
 			finf.push(f);
 		}
+		var queue = new List();
+		while( true ) {
+			var c = clientQueue.pop(false);
+			if( c == null ) break;
+			queue.add(c);
+		}
+		var queueSize = queue.length;
+		for( c in queue )
+			clientQueue.add(c);
 		return {
 			threads : tinf,
 			files : finf,
 			totalHits : totalHits,
 			recentHits : recentHits,
 			queue : totalHits - tot,
+			activeConnections : activeConnections,
 			upTime : haxe.Timer.stamp() - startTime,
 			jit : jit,
 		};
@@ -609,6 +630,11 @@ class Tora {
 
 	public function resolveHost( name : String ) {
 		return hosts.get(name);
+	}
+
+	public function handleRequest( c : Client ) {
+		totalHits++;
+		clientQueue.add(c);
 	}
 
 	var xmlCache : String;

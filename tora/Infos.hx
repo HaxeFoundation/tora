@@ -39,6 +39,7 @@ typedef Infos = {
 	var totalHits : Int;
 	var recentHits : Int;
 	var queue : Int;
+	var activeConnections : Int;
 	var upTime : Float;
 	var jit : Bool;
 }

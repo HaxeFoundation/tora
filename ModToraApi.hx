@@ -102,12 +102,12 @@ class ModToraApi extends ModNekoApi {
 						if( retryCount % 200 == 0 )
 							Tora.log("DOING "+retryCount+" RETRY "+c.hostName+url);
 						c.buffer = new StringBuf();
-						Tora.inst.delay(0.5,function() Tora.inst.clientQueue.push(c));
+						Tora.inst.delay(0.5,function() Tora.inst.handleRequest(c));
 					} else if( retryCount > 0 )
 						Tora.log("DID "+retryCount+" RETRY "+c.hostName+url);
 				};
 			}
-			Tora.inst.delay(delay,function() Tora.inst.clientQueue.push(c));
+			Tora.inst.delay(delay,function() Tora.inst.handleRequest(c));
 			return null;
 		}
 		var lock = new neko.vm.Lock();
@@ -116,7 +116,7 @@ class ModToraApi extends ModNekoApi {
 			data = c.buffer.toString();
 			lock.release();
 		};
-		Tora.inst.clientQueue.push(c);
+		Tora.inst.handleRequest(c);
 		lock.wait();
 		return neko.NativeString.ofString(data);
 	}

@@ -27,6 +27,7 @@ class Client {
 	public var data : String;
 	public var bytes : Int;
 	public var dataBytes : Int;
+	public var cachedCode : Int;
 
 	// variables
 	public var execute : Bool;
@@ -35,8 +36,8 @@ class Client {
 	public var ip : String;
 	public var getParams : String;
 	public var postData : String;
-	public var headers : Array<{ k : String, v : String }>;
-	public var params : Array<{ k : String, v : String }>;
+	public var headers : List<{ k : String, v : String }>;
+	public var params : List<{ k : String, v : String }>;
 	public var hostName : String;
 	public var httpMethod : String;
 	public var headersSent : Bool;
@@ -49,6 +50,7 @@ class Client {
 	public var notifyApi : ModToraApi;
 	public var notifyQueue : Queue;
 	public var lockedShares : List<Share>;
+	public var writeLock : neko.vm.Mutex;
 
 	var key : String;
 
@@ -57,9 +59,22 @@ class Client {
 		this.secure = secure;
 		dataBytes = 0;
 		headersSent = false;
-		headers = new Array();
+		headers = new List();
 		outputHeaders = new List();
-		params = new Array();
+		params = new List();
+	}
+
+	public function prepare() {
+		if( writeLock == null )
+			writeLock = new neko.vm.Mutex();
+		dataBytes = 0;
+		headersSent = false;
+		outputHeaders = new List();
+		headers = new List();
+		params = new List();
+		getParams = null;
+		postData = null;
+		execute = null;
 	}
 
 	public function sendHeaders() {
@@ -81,7 +96,13 @@ class Client {
 
 	public function readMessage() : Code {
 		var i = sock.input;
-		var code = i.readByte();
+		var code;
+		if( cachedCode == null )
+			code = i.readByte();
+		else {
+			code = cachedCode;
+			cachedCode = null;
+		}
 		if( code == 0 || code > CODES.length ) {
 			if( code == "<".code ) {
 				try {
@@ -105,9 +126,22 @@ class Client {
 
 	public function sendMessage( code : Code, msg : String ) {
 		var o = sock.output;
-		o.writeByte( Type.enumIndex(code) + 1 );
-		o.writeUInt24( msg.length );
-		o.writeString( msg );
+		if( writeLock != null ) {
+			writeLock.acquire();
+			try {
+				o.writeByte( Type.enumIndex(code) + 1 );
+				o.writeUInt24( msg.length );
+				o.writeString( msg );
+			} catch( e : Dynamic ) {
+				writeLock.release();
+				neko.Lib.rethrow(e);
+			}
+			writeLock.release();
+		} else {
+			o.writeByte( Type.enumIndex(code) + 1 );
+			o.writeUInt24( msg.length );
+			o.writeString( msg );
+		}
 	}
 
 	public function processMessage() {

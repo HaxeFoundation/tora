@@ -51,6 +51,24 @@ class Protocol {
 		params.push({ key : key, value : value });
 	}
 
+	public function reset() {
+		headers = new Array();
+		params = new Array();
+	}
+
+	public function call( url ) {
+		if( sock == null ) {
+			error("Not connected");
+			return;
+		}
+		var r = ~/^http:\/\/([^\/:]+)(:[0-9]+)?(.*)$/;
+		if( !r.match(url) )
+			throw "Invalid url "+url;
+		uri = r.matched(3);
+		if( uri == "" ) uri = "/";
+		onConnect(null);
+	}
+
 	public function connect() {
 		#if flash
 		sock = new flash.net.Socket();

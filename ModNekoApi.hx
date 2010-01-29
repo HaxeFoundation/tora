@@ -205,7 +205,7 @@ class ModNekoApi {
 		client.outputHeaders.add({ code : c, str : str });
 	}
 
-	static function makeTable( list : Array<{ k : String, v : String }> ) : Dynamic {
+	static function makeTable( list : List<{ k : String, v : String }> ) : Dynamic {
 		var v : Dynamic = null;
 		for( h in list )
 			v = untyped __dollar__array(NativeString.ofString(h.k),NativeString.ofString(h.v),v);
