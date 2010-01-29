@@ -155,7 +155,9 @@ class Protocol {
 			if( sock.bytesAvailable < dataLength )
 				return;
 			var bytes = new flash.utils.ByteArray();
-			var data = sock.readBytes(bytes,0,dataLength);
+			// ouch !! flash will read the whole data if 0 length !
+			if( dataLength > 0 )
+				sock.readBytes(bytes,0,dataLength);
 			#elseif neko
 			var i = sock.input;
 			var code = i.readByte() - 1;
