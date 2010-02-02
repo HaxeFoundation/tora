@@ -152,7 +152,8 @@ class Tora {
 					}
 			dt = neko.Sys.time() - lastTime;
 			if( dt > 1 ) {
-				recentHits = Std.int((totalHits - lastHits) / dt);
+				var hits = Std.int((totalHits - lastHits) / dt);
+				recentHits = Math.ceil(recentHits * 0.5 + hits * 0.5);
 				lastTime += dt;
 				lastHits = totalHits;
 			}
