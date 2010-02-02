@@ -154,7 +154,19 @@ class ModToraApi extends ModNekoApi {
 	function share_get( s : Share, lock : Bool ) {
 		if( lock && s.owner != client ) {
 			if( s.free ) throw neko.NativeString.ofString("Can't lock a share which have been free");
-			s.lock.acquire();
+			if( !s.lock.tryAcquire() ) {
+				client.waitingShare = s;
+				var owner = s.owner;
+				var ws = if( owner == null ) null else owner.waitingShare;
+				if( ws != null && client.lockedShares != null )
+					for( s in client.lockedShares )
+						if( s == ws ) {
+							client.waitingShare = null;
+							throw neko.NativeString.ofString("Deadlock between "+client.getURL()+":"+s.name+" and "+owner.getURL()+":"+ws.name);
+						}
+				s.lock.acquire();
+				client.waitingShare = null;
+			}
 			s.owner = client;
 			if( client.lockedShares == null )
 				client.lockedShares = new List();

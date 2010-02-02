@@ -49,6 +49,7 @@ class Client {
 	public var onStop : Void -> Void;
 	public var notifyApi : ModToraApi;
 	public var notifyQueue : Queue;
+	public var waitingShare : Share;
 	public var lockedShares : List<Share>;
 	public var writeLock : neko.vm.Mutex;
 
