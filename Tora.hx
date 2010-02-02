@@ -536,7 +536,11 @@ class Tora {
 				var size = bytes(s.data);
 				total += size;
 				neko.Lib.print("Share '"+s.name+"' "+Math.ceil(size/1024)+" KB");
-				if( c != null ) neko.Lib.print(" locked by "+c.getURL());
+				if( c != null ) {
+					neko.Lib.print(" locked by "+c.getURL());
+					var ws = c.waitingShare;
+					if( ws != null ) neko.Lib.print(" waiting for "+ws.name);
+				}
 				neko.Lib.println("<br>");
 			}
 			neko.Lib.println("Total : "+Math.ceil(total/1024)+" KB<br>");
