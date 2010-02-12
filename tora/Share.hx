@@ -56,6 +56,11 @@ class Share<T> {
 		share_free(s);
 	}
 
+	public static function commitAll() {
+		init();
+		share_commit_all();
+	}
+
 	static function init() {
 		if( share_init != null ) return;
 		share_init = neko.Lib.load("mod_neko","share_init",2);
@@ -63,6 +68,7 @@ class Share<T> {
 		share_set = neko.Lib.load("mod_neko","share_set",2);
 		share_commit = neko.Lib.load("mod_neko","share_commit",1);
 		share_free = neko.Lib.load("mod_neko","share_free",1);
+		share_commit_all = neko.Lib.load("mod_neko","share_commit_all",0);
 	}
 
 	static var share_init = null;
@@ -70,5 +76,6 @@ class Share<T> {
 	static var share_set;
 	static var share_commit;
 	static var share_free;
+	static var share_commit_all;
 
 }

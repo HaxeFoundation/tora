@@ -195,6 +195,16 @@ class ModToraApi extends ModNekoApi {
 		shares_lock.release();
 	}
 
+	function share_commit_all() {
+		if( client.lockedShares != null ) {
+			for( s in client.lockedShares ) {
+				s.owner = null;
+				s.lock.release();
+			}
+			client.lockedShares = null;
+		}
+	}
+
 	// queues
 
 	static var queues = new Hash<Queue>();
@@ -256,7 +266,11 @@ class ModToraApi extends ModNekoApi {
 	}
 
 	function queue_stop( q : Queue ) {
-		// we might be in a closure on another api, so let's fetch our real client
+		// if we are inside a onNotify/onStop, queue_stop is a closure on the API the module
+		// was initialized with, which is not the current thread API.
+		// we then need to fetch our real client
+		// Note : only print (per-thread) and queue_stop (with above fix)
+		// are working correctly in onNotify/onStop
 		var client = Tora.inst.getCurrentClient().notifyApi.client;
 		if( client.notifyQueue != q )
 			throw neko.NativeString.ofString("You can't stop on a queue you're not waiting");
