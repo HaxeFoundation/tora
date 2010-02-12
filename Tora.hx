@@ -254,12 +254,12 @@ class Tora {
 		c.writeLock.acquire();
 		c.needClose = true; // no more writes
 		switch( mode ) {
-		case CSocketsLoop, CHandle, CCleanup:
+		case CSocketsLoop, CHandle:
 			// these are mutually exclusive so no read can happen
 			// no write either since we hold the lock
 			// we can close the socket safely
 			try c.sock.close() catch( e : Dynamic ) {};
-		case CNotify:
+		case CNotify, CCleanup:
 			// only notify if socket is still in socketsLoop
 			// either it will be either notified on closed
 			if( !c.handlingMessage )
