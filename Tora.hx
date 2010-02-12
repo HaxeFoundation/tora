@@ -39,6 +39,13 @@ typedef FileData = {
 	var cache : haxe.FastList<ModToraApi>;
 }
 
+enum CloseMode {
+	CSocketsLoop;
+	CHandle;
+	CCleanup;
+	CNotify;
+}
+
 class Tora {
 
 	var clientQueue : neko.vm.Deque<Client>;
@@ -171,9 +178,8 @@ class Tora {
 				var client = pendingSocks.pop(socks.length == 0);
 				if( client == null ) break;
 				changed = true;
-				// if we have a manually stopped client, then we close the socket
-				if( client.onNotify == null ) {
-					try client.sock.close() catch( e : Dynamic ) {};
+				if( client.needClose ) {
+					close(client,CSocketsLoop);
 					socks.remove(client.sock);
 				} else {
 					client.sock.custom = client;
@@ -200,12 +206,18 @@ class Tora {
 				for( c in toact ) {
 					socks.remove(c.sock);
 					try {
+						c.writeLock.acquire();
+						if( c.needClose ) {
+							c.writeLock.release();
+							throw "Closing";
+						}
+						c.handlingMessage = true;
+						c.writeLock.release();
 						c.cachedCode = c.sock.input.readByte();
 						c.prepare();
 						handleRequest(c);
 					} catch( e : Dynamic ) {
-						disconnectClient(c);
-						c.sock.close();
+						close(c,CSocketsLoop);
 					}
 				}
 				changed = true;
@@ -213,24 +225,47 @@ class Tora {
 		}
 	}
 
-	function disconnectClient( c : Client ) {
+	function close( c : Client, mode : CloseMode ) {
 		var q = c.notifyQueue;
-		if( q == null )
-			return;
-		q.lock.acquire();
-		if( !q.clients.remove(c) ) {
+		do {
+			if( q == null )
+				break;
+			q.lock.acquire();
+			if( !q.clients.remove(c) ) {
+				q.lock.release();
+				break;
+			}
+			if( c.onStop != null )
+				try c.onStop() catch( e : Dynamic ) log(Std.string(e));
+			c.onNotify = null;
+			c.onStop = null;
 			q.lock.release();
+			var api = c.notifyApi;
+			api.lock.acquire();
+			api.listening.remove(c);
+			api.lock.release();
+		} while( false );
+		// fast path for common requests
+		if( c.writeLock == null ) {
+			c.sock.close();
 			return;
 		}
-		if( c.onStop != null )
-			try c.onStop() catch( e : Dynamic ) log(Std.string(e));
-		c.onNotify = null;
-		c.onStop = null;
-		q.lock.release();
-		var api = c.notifyApi;
-		api.lock.acquire();
-		api.listening.remove(c);
-		api.lock.release();
+		// concurrent requests
+		c.writeLock.acquire();
+		c.needClose = true; // no more writes
+		switch( mode ) {
+		case CSocketsLoop, CHandle, CCleanup:
+			// these are mutually exclusive so no read can happen
+			// no write either since we hold the lock
+			// we can close the socket safely
+			try c.sock.close() catch( e : Dynamic ) {};
+		case CNotify:
+			// only notify if socket is still in socketsLoop
+			// either it will be either notified on closed
+			if( !c.handlingMessage )
+				pendingSocks.add(c);
+		}
+		c.writeLock.release();
 	}
 
 	function initLoader( api : ModToraApi ) {
@@ -282,35 +317,14 @@ class Tora {
 		var cl = api.listening;
 		api.listening = new List();
 		api.lock.release();
-		for( c in cl ) {
-			var q = c.notifyQueue;
-			q.lock.acquire();
-			if( !q.clients.remove(c) ) {
-				q.lock.release();
-				continue;
-			}
-			c.onNotify = null;
-			c.onStop = null;
-			api.client = c;
-			try {
-				c.sendMessage(CExecute,"");
-				pendingSocks.add(c);
-			} catch( e : Dynamic ) {
-				// socket will be closed soon anyway
-			}
-			q.lock.release();
-		}
+		for( c in cl )
+			close(c,CCleanup);
 		api.client = null;
 	}
 
 	public function handleNotify( c : Client, message : Dynamic ) {
 		try {
 			c.onNotify(message);
-			// if the client has been stopped, tell the notifyLoop so it can close the socket
-			if( c.onNotify == null ) {
-				c.sendMessage(tora.Code.CExecute,"");
-				pendingSocks.add(c);
-			}
 		} catch( e : Dynamic ) {
 			var data = try {
 				var stack = haxe.Stack.exceptionStack();
@@ -320,9 +334,11 @@ class Tora {
 			try {
 				c.sendMessage(tora.Code.CError,data);
 			} catch( _ : Dynamic ) {
-				// the socket might be closed soon by the notifyLoop
+				c.needClose = true;
 			}
 		}
+		if( c.needClose )
+			close(c,CNotify);
 	}
 
 	public function getCurrentClient() {
@@ -358,6 +374,8 @@ class Tora {
 				}
 				if( client.execute && client.file == null )
 					throw "Missing module file";
+				if( client.execute && client.needClose )
+					throw "Closed client";
 			} catch( e : Dynamic ) {
 				if( client.secure ) log("Error while reading request ("+Std.string(e)+")");
 				t.errors++;
@@ -365,8 +383,7 @@ class Tora {
 			}
 			// check if we need to do something
 			if( !client.execute ) {
-				disconnectClient(client);
-				client.sock.close();
+				close(client,CHandle);
 				t.client = null;
 				continue;
 			}
@@ -434,7 +451,7 @@ class Tora {
 			} catch( e : Dynamic ) {
 				if( client.secure ) log("Error while sending answer ("+Std.string(e)+")");
 				t.errors++;
-				client.onNotify = null;
+				client.needClose = true;
 			}
 			// save infos
 			f.lock.acquire();
@@ -456,12 +473,12 @@ class Tora {
 				}
 				client.lockedShares = null;
 			}
-			if( client.notifyQueue != null ) {
-				// start monitoring the socket
-				client.uri = "<"+client.notifyQueue.name+">";
+			if( client.notifyQueue == null || client.needClose )
+				close(client,CHandle);
+			else {
+				client.handlingMessage = false;
 				pendingSocks.add(client);
-			} else
-				client.sock.close();
+			}
 		}
 	}
 
@@ -498,7 +515,7 @@ class Tora {
 			var c = clientQueue.pop(false);
 			if( c == null )
 				break;
-			c.sock.close();
+			close(c,CHandle);
 			count++;
 		}
 		log(count + " sockets closed in queue...");

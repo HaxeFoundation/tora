@@ -52,6 +52,8 @@ class Client {
 	public var waitingShare : Share;
 	public var lockedShares : List<Share>;
 	public var writeLock : neko.vm.Mutex;
+	public var needClose : Bool;
+	public var handlingMessage : Bool;
 
 	var key : String;
 
@@ -66,8 +68,6 @@ class Client {
 	}
 
 	public function prepare() {
-		if( writeLock == null )
-			writeLock = new neko.vm.Mutex();
 		dataBytes = 0;
 		headersSent = false;
 		outputHeaders = new List();
@@ -127,6 +127,7 @@ class Client {
 
 	public function sendMessage( code : Code, msg : String ) {
 		var o = sock.output;
+		if( needClose ) return;
 		if( writeLock != null ) {
 			writeLock.acquire();
 			try {

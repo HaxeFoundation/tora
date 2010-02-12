@@ -193,10 +193,11 @@ class ModNekoApi {
 		var str = NativeString.toString(untyped if( __dollar__typeof(value) == __dollar__tstring ) value else __dollar__string(value));
 		try {
 			client.sendHeaders();
-			client.dataBytes += str.length;
 			client.sendMessage(CPrint,str);
+			client.dataBytes += str.length;
 		} catch( e : Dynamic ) {
 			// never abort a print, this might cause side effects on the program
+			client.needClose = true; // does NOT send anything else
 		}
 	}
 

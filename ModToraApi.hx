@@ -226,14 +226,16 @@ class ModToraApi extends ModNekoApi {
 		client.onNotify = onNotify;
 		var me = this;
 		client.onStop = onStop;
-		// add to queue
-		q.lock.acquire();
-		q.clients.add(client);
-		q.lock.release();
 		// add to listeners
 		lock.acquire();
 		listening.add(client);
 		lock.release();
+		// add to queue
+		q.lock.acquire();
+		q.clients.add(client);
+		if( client.writeLock == null )
+			client.writeLock = new neko.vm.Mutex();
+		q.lock.release();
 	}
 
 	function queue_notify( q : Queue, message : Dynamic ) {
@@ -262,6 +264,8 @@ class ModToraApi extends ModNekoApi {
 		q.clients.remove(client);
 		client.onNotify = null;
 		client.onStop = null;
+		try client.sendMessage(tora.Code.CExecute,"") catch( e : Dynamic) {};
+		client.needClose = true;
 		q.lock.release();
 		// the api might be different than 'this'
 		var api = client.notifyApi;
