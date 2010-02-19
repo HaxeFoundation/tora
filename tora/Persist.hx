@@ -30,6 +30,8 @@ private enum PType {
 	PList( t : PType );
 	PHashRaw;
 	PHash( t : PType );
+	PIntHashRaw;
+	PIntHash( t : PType );
 }
 
 class Persist<T> {
@@ -105,6 +107,12 @@ class Persist<T> {
 					else
 						PNativeArray(t);
 				case "Hash":
+					var t = processType(pl.first());
+					if( t == PRaw && !stm )
+						PHashRaw;
+					else
+						PHash(t);
+				case "IntHash":
 					var t = processType(pl.first());
 					if( t == PRaw && !stm )
 						PHashRaw;
@@ -187,6 +195,11 @@ class Persist<T> {
 			}
 			case PHashRaw: if( v == null ) null else untyped v.h;
 			case PHash(t): if( v == null ) null else {
+				var a = 0;
+				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,unwrap(v,t),a));
+				a;
+			case PIntHashRaw: if( v == null ) null else untyped v.h;
+			case PIntHash(t): if( v == null ) null else {
 				var a = 0;
 				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,unwrap(v,t),a));
 				a;
@@ -273,6 +286,19 @@ class Persist<T> {
 			}
 			case PHash(t): if( v == null ) null else {
 				var h = new Hash<Dynamic>();
+				while( v != 0 ) {
+					untyped __dollar__hadd(h.h,v[0],wrap(v[1],t));
+					v = v[2];
+				}
+				h;
+			}
+			case PIntHashRaw: if( v == null ) null else {
+				var h = new IntHash<Dynamic>();
+				untyped h.h = v;
+				h;
+			}
+			case PIntHash(t): if( v == null ) null else {
+				var h = new IntHash<Dynamic>();
 				while( v != 0 ) {
 					untyped __dollar__hadd(h.h,v[0],wrap(v[1],t));
 					v = v[2];
