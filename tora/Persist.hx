@@ -115,9 +115,9 @@ class Persist<T> {
 				case "IntHash":
 					var t = processType(pl.first());
 					if( t == PRaw && !stm )
-						PHashRaw;
+						PIntHashRaw;
 					else
-						PHash(t);
+						PIntHash(t);
 				default: throw "Unsupported class "+c;
 				}
 			case CAnonymous(a):
@@ -196,12 +196,15 @@ class Persist<T> {
 			case PHashRaw: if( v == null ) null else untyped v.h;
 			case PHash(t): if( v == null ) null else {
 				var a = 0;
-				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,unwrap(v,t),a));
+				var me = this;
+				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,me.unwrap(v,t),a));
 				a;
+			}
 			case PIntHashRaw: if( v == null ) null else untyped v.h;
 			case PIntHash(t): if( v == null ) null else {
 				var a = 0;
-				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,unwrap(v,t),a));
+				var me = this;
+				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,me.unwrap(v,t),a));
 				a;
 			}
 		};
