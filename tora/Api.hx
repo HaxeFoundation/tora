@@ -27,7 +27,7 @@ class Api {
 	}
 
 	public static function unsafeRequest() : Bool {
-		return neko.Lib.load("mod_neko","tora_unsafe",0)();
+		return unsafe_request();
 	}
 
 	public static function call( uri : String, ?delay : Float, ?needResult : String ) : String {
@@ -36,6 +36,7 @@ class Api {
 		return (r == null) ? null : neko.NativeString.toString(r);
 	}
 
-	static var tora_call = neko.Lib.loadLazy("mod_neko","tora_call",3);
+	static var tora_call = neko.Lib.loadLazy("mod_neko", "tora_call", 3);
+	static var unsafe_request = neko.Lib.load("mod_neko", "tora_unsafe", 0);
 
 }
