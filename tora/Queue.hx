@@ -45,11 +45,11 @@ class Queue<T> {
 
 	static function init() {
 		if( queue_init != null ) return;
-		queue_init = neko.Lib.load("mod_neko","queue_init",1);
-		queue_listen = neko.Lib.load("mod_neko","queue_listen",3);
-		queue_notify = neko.Lib.load("mod_neko","queue_notify",2);
-		queue_count = neko.Lib.load("mod_neko","queue_count",1);
-		queue_stop = neko.Lib.load("mod_neko","queue_stop",1);
+		queue_init = neko.Lib.load(Api.lib,"queue_init",1);
+		queue_listen = neko.Lib.load(Api.lib,"queue_listen",3);
+		queue_notify = neko.Lib.load(Api.lib,"queue_notify",2);
+		queue_count = neko.Lib.load(Api.lib,"queue_count",1);
+		queue_stop = neko.Lib.load(Api.lib,"queue_stop",1);
 	}
 
 	static var queue_init = null;

@@ -18,12 +18,14 @@ package tora;
 
 class Api {
 
+	public static var lib(default,null) : String;
+
 	public static function getInfos() : Infos {
-		return neko.Lib.load("mod_neko","tora_infos",0)();
+		return neko.Lib.load(lib,"tora_infos",0)();
 	}
 
 	public static function command( cmd : String, ?param : String ) : Dynamic {
-		return neko.Lib.load("mod_neko","tora_command",2)(cmd,param);
+		return neko.Lib.load(lib,"tora_command",2)(cmd,param);
 	}
 
 	public static function unsafeRequest() : Bool {
@@ -36,7 +38,14 @@ class Api {
 		return (r == null) ? null : neko.NativeString.toString(r);
 	}
 
-	static var tora_call = neko.Lib.loadLazy("mod_neko", "tora_call", 3);
-	static var unsafe_request = neko.Lib.load("mod_neko", "tora_unsafe", 0);
+	static var _ =  {
+		var v = neko.Sys.getEnv("MOD_NEKO");
+		if( v == null || v == "1" )
+			v = "";
+		lib = "mod_neko"+v;
+	}	
+	static var tora_call = neko.Lib.loadLazy(lib, "tora_call", 3);
+	static var unsafe_request = neko.Lib.load(lib, "tora_unsafe", 0);
+	static var set_cron = neko.Lib.loadLazy(lib,"tora_set_cron",3);
 
 }

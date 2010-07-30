@@ -63,12 +63,12 @@ class Share<T> {
 
 	static function init() {
 		if( share_init != null ) return;
-		share_init = neko.Lib.load("mod_neko","share_init",2);
-		share_get = neko.Lib.load("mod_neko","share_get",2);
-		share_set = neko.Lib.load("mod_neko","share_set",2);
-		share_commit = neko.Lib.load("mod_neko","share_commit",1);
-		share_free = neko.Lib.load("mod_neko","share_free",1);
-		share_commit_all = neko.Lib.load("mod_neko","share_commit_all",0);
+		share_init = neko.Lib.load(Api.lib,"share_init",2);
+		share_get = neko.Lib.load(Api.lib,"share_get",2);
+		share_set = neko.Lib.load(Api.lib,"share_set",2);
+		share_commit = neko.Lib.load(Api.lib,"share_commit",1);
+		share_free = neko.Lib.load(Api.lib,"share_free",1);
+		share_commit_all = neko.Lib.load(Api.lib,"share_commit_all",0);
 	}
 
 	static var share_init = null;
