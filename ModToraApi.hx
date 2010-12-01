@@ -31,8 +31,6 @@ typedef Queue = {
 
 class NullClient extends Client {
 
-	public var buffer : StringBuf;
-
 	public function new( file : String, host : String, uri : String ) {
 		super(cast { setTimeout : function(_) {}, setFastSend : function(_) {}, close : function() {} },true);
 		this.file = file;
@@ -41,7 +39,6 @@ class NullClient extends Client {
 		ip = "127.0.0.1";
 		getParams = "";
 		httpMethod = "CALL";
-		buffer = new StringBuf();
 		execute = true;
 	}
 
@@ -51,7 +48,7 @@ class NullClient extends Client {
 
 	override public function sendMessage( code : tora.Code, msg ) {
 		switch( code ) {
-		case CPrint: buffer.add(msg);
+		case CPrint:
 		case CError, CExecute: onExecute();
 		default:
 		}
@@ -68,6 +65,9 @@ class ModToraApi extends ModNekoApi {
 	// keep a list of clients in case the module is updated
 	public var listening : List<Client>;
 	public var lock : neko.vm.Mutex;
+	
+	public var module : neko.vm.Module;
+	public var time : Float;
 
 	public function new(client) {
 		super(client);
@@ -89,36 +89,35 @@ class ModToraApi extends ModNekoApi {
 		return !client.secure;
 	}
 
-	function tora_call( url : neko.NativeString, ?delay : Float, ?result : neko.NativeString ) {
+	function tora_set_cron( url : neko.NativeString, delay : Float ) {
 		var url = neko.NativeString.toString(url);
-		var c = new NullClient(client.file,client.hostName,url);
-		if( delay != null ) {
-			if( result != null ) {
-				var retryCount = 0;
-				c.onExecute = function() {
-					var data = c.buffer.toString();
-					if( data != neko.NativeString.toString(result) ) {
-						retryCount++;
-						if( retryCount % 200 == 0 )
-							Tora.log("DOING "+retryCount+" RETRY "+c.hostName+url);
-						c.buffer = new StringBuf();
-						Tora.inst.delay(0.5,function() Tora.inst.handleRequest(c));
-					} else if( retryCount > 0 )
-						Tora.log("DID "+retryCount+" RETRY "+c.hostName+url);
-				};
-			}
-			Tora.inst.delay(delay,function() Tora.inst.handleRequest(c));
-			return null;
+		var c = new NullClient(client.file, client.hostName, url);
+		var callb = function() Tora.inst.handleRequest(c);
+		var f = Tora.inst.getFile(client.file);
+		if( f.cron == null )
+			f.cron = Tora.inst.delay(delay, callb, true);
+		else {
+			f.cron.time = delay;
+			f.cron.callb = callb;
 		}
+	}
+	
+	function tora_get_exports( host : neko.NativeString ) {
+		var host = neko.NativeString.toString(host);
+		var file = Tora.inst.resolveHost(host);
+		if( file == null ) throw neko.NativeString.ofString("Unknown host '" + host + "'");
+		// fast path : get from cache
+		var f = Tora.inst.getFile(file);
+		var h = f.cache.head;
+		if( h != null && h.elt.time == Tora.inst.getFileTime(file) )
+			return h.elt.module.exportsTable();
+		// slow path : make an async request on /
+		var c = new NullClient(file, host, "/");
 		var lock = new neko.vm.Lock();
-		var data = null;
-		c.onExecute = function() {
-			data = c.buffer.toString();
-			lock.release();
-		};
+		c.onExecute = function() lock.release();
 		Tora.inst.handleRequest(c);
 		lock.wait();
-		return neko.NativeString.ofString(data);
+		return c.usedAPI.module.exportsTable();
 	}
 
 	// shares

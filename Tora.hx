@@ -37,6 +37,7 @@ typedef FileData = {
 	var time : Float;
 	var lock : neko.vm.Mutex;
 	var cache : haxe.FastList<ModToraApi>;
+	var cron : Timer;
 }
 
 enum CloseMode {
@@ -44,6 +45,13 @@ enum CloseMode {
 	CHandle;
 	CCleanup;
 	CNotify;
+}
+
+typedef Timer = {
+	var elapsed : Float;
+	var time : Float;
+	var callb : Void -> Void;
+	var repeat : Bool;
 }
 
 class Tora {
@@ -67,7 +75,7 @@ class Tora {
 	var hosts : Hash<String>;
 	var ports : Array<Int>;
 	var tls : neko.vm.Tls<ThreadData>;
-	var delayQueue : List<{ t : Float, f : Void -> Void }>;
+	var delayQueue : List<Timer>;
 	var delayWait : neko.vm.Lock;
 	var delayLock : neko.vm.Mutex;
 
@@ -138,15 +146,18 @@ class Tora {
 			var toExecute = null;
 			nextDelay = null;
 			for( d in delayQueue ) {
-				var t = d.t - dt;
-				if( t < 0 ) {
+				d.elapsed += dt;
+				var rem = d.time - d.elapsed;
+				if( rem < 0 ) {
 					if( toExecute == null ) toExecute = new List();
-					toExecute.add(d.f);
-					delayQueue.remove(d);
+					toExecute.add(d.callb);
+					if( d.repeat )
+						d.elapsed += d.time;
+					else
+						delayQueue.remove(d);
 				} else {
-					d.t = t;
-					if( nextDelay == null || nextDelay > t )
-						nextDelay = t;
+					if( nextDelay == null || nextDelay > rem )
+						nextDelay = rem;
 				}
 			}
 			delayLock.release();
@@ -273,7 +284,7 @@ class Tora {
 		var mod_neko = neko.NativeString.ofString("mod_neko@");
 		var mem_size = "std@mem_size";
 		var self : neko.vm.Loader = null;
-		var first_module = jit;
+		var first_module = true;
 		var loadPrim = function(prim:String,nargs:Int) {
 			if( untyped __dollar__sfind(prim.__s,0,mod_neko) == 0 ) {
 				var p = Reflect.field(api,prim.substr(9));
@@ -292,12 +303,13 @@ class Tora {
 			var cache : Dynamic = untyped self.l.cache;
 			var mod = Reflect.field(cache,module);
 			if( mod == null ) {
-				if( first_module )
+				if( me.jit && first_module )
 					me.enable_jit(true);
 				mod = neko.vm.Module.readPath(module,me.modulePath,self);
 				if( first_module ) {
-					me.enable_jit(false);
 					first_module = false;
+					api.module = mod;
+					if( me.jit ) me.enable_jit(false);
 				}
 				Reflect.setField(cache,module,mod);
 				mod.execute();
@@ -308,7 +320,7 @@ class Tora {
 		return self;
 	}
 
-	function getFileTime( file ) {
+	public function getFileTime( file ) {
 		return try neko.FileSystem.stat(file).mtime.getTime() catch( e : Dynamic ) 0.;
 	}
 
@@ -346,13 +358,41 @@ class Tora {
 		return (t == null) ? null : t.client;
 	}
 
-	public function delay( t : Float, f ) {
+	public function delay( t : Float, f, repeat : Bool ) {
+		var t : Timer = { time : t, elapsed : 0., callb : f, repeat : repeat };
 		delayLock.acquire();
-		delayQueue.add({ t : t, f : f });
+		delayQueue.add(t);
 		delayLock.release();
 		delayWait.release(); // signal
+		return t;
 	}
-
+	
+	public function getFile( file : String ) {
+		var f = files.get(file);
+		if( f != null )
+			return f;
+		// file entry not found : we need to acquire
+		// a global lock before setting the entry
+		flock.acquire();
+		f = files.get(file);
+		if( f == null ) {
+			f = {
+				file : file,
+				filetime : 0.,
+				loads : 0,
+				cacheHits : 0,
+				lock : new neko.vm.Mutex(),
+				cache : new haxe.FastList<ModToraApi>(),
+				bytes : 0.,
+				time : 0.,
+				cron : null,
+			};
+			files.set(file,f);
+		}
+		flock.release();
+		return f;
+	}
+	
 	function threadLoop( t : ThreadData ) {
 		tls.value = t;
 		set_trusted(true);
@@ -387,28 +427,8 @@ class Tora {
 				t.client = null;
 				continue;
 			}
-			var f = files.get(client.file);
+			var f = getFile(client.file);
 			var api = null;
-			// file entry not found : we need to acquire
-			// a global lock before setting the entry
-			if( f == null ) {
-				flock.acquire();
-				f = files.get(client.file);
-				if( f == null ) {
-					f = {
-						file : client.file,
-						filetime : 0.,
-						loads : 0,
-						cacheHits : 0,
-						lock : new neko.vm.Mutex(),
-						cache : new haxe.FastList<ModToraApi>(),
-						bytes : 0.,
-						time : 0.,
-					};
-					files.set(client.file,f);
-				}
-				flock.release();
-			}
 			// check if up-to-date cache is available
 			f.lock.acquire();
 			var time = getFileTime(client.file);
@@ -430,10 +450,13 @@ class Tora {
 			try {
 				if( api == null ) {
 					api = new ModToraApi(client);
+					api.time = time;
+					client.usedAPI = api;
 					redirect(api.print);
 					initLoader(api).loadModule(client.file);
 				} else {
 					api.client = client;
+					client.usedAPI = api;
 					redirect(api.print);
 					api.main();
 				}

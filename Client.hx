@@ -42,9 +42,10 @@ class Client {
 	public var httpMethod : String;
 	public var headersSent : Bool;
 	public var outputHeaders : List<{ code : Code, str : String }>;
-
-	// queue variables
+	
+	// tora variables
 	public var secure : Bool;
+	public var usedAPI : ModToraApi;
 	public var onNotify : Dynamic -> Void;
 	public var onStop : Void -> Void;
 	public var notifyApi : ModToraApi;

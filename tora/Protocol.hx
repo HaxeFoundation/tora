@@ -152,7 +152,8 @@ class Protocol {
 				var d3 = sock.readUnsignedByte();
 				dataLength = d1 | (d2 << 8) | (d3 << 16);
 			}
-			if( sock.bytesAvailable < dataLength )
+			var bl : Int = sock.bytesAvailable;
+			if( bl < dataLength )
 				return;
 			var bytes = new flash.utils.ByteArray();
 			// ouch !! flash will read the whole data if 0 length !

@@ -31,11 +31,13 @@ class Api {
 	public static function unsafeRequest() : Bool {
 		return unsafe_request();
 	}
-
-	public static function call( uri : String, ?delay : Float, ?needResult : String ) : String {
-		var res = needResult == null ? null : neko.NativeString.ofString(needResult);
-		var r = tora_call(neko.NativeString.ofString(uri),delay,res);
-		return (r == null) ? null : neko.NativeString.toString(r);
+	
+	public static function setCron( url : String, delay : Float ) {
+		neko.Lib.load(lib, "tora_set_cron", 2)(untyped url.__s, delay);
+	}
+	
+	public static function getExports( host : String ) : Dynamic {
+		return neko.Lib.load(lib, "tora_get_exports", 1)(untyped host.__s);
 	}
 
 	static var _ =  {
@@ -43,9 +45,7 @@ class Api {
 		if( v == null || v == "1" )
 			v = "";
 		lib = "mod_neko"+v;
-	}	
-	static var tora_call = neko.Lib.loadLazy(lib, "tora_call", 3);
-	static var unsafe_request = neko.Lib.load(lib, "tora_unsafe", 0);
-	static var set_cron = neko.Lib.loadLazy(lib,"tora_set_cron",3);
+	}
+	static var unsafe_request = neko.Lib.loadLazy(lib, "tora_unsafe", 0);
 
 }
