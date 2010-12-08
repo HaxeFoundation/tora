@@ -65,7 +65,7 @@ class ModToraApi extends ModNekoApi {
 	// keep a list of clients in case the module is updated
 	public var listening : List<Client>;
 	public var lock : neko.vm.Mutex;
-	
+
 	public var module : neko.vm.Module;
 	public var time : Float;
 
@@ -91,8 +91,8 @@ class ModToraApi extends ModNekoApi {
 
 	function tora_set_cron( url : neko.NativeString, delay : Float ) {
 		var url = neko.NativeString.toString(url);
-		var c = new NullClient(client.file, client.hostName, url);
-		var callb = function() Tora.inst.handleRequest(c);
+		var file = client.file, host = client.hostName;
+		var callb = function() Tora.inst.handleRequest(new NullClient(file, host, url));
 		var f = Tora.inst.getFile(client.file);
 		if( f.cron == null )
 			f.cron = Tora.inst.delay(delay, callb, true);
@@ -101,7 +101,7 @@ class ModToraApi extends ModNekoApi {
 			f.cron.callb = callb;
 		}
 	}
-	
+
 	function tora_get_exports( host : neko.NativeString ) {
 		var host = neko.NativeString.toString(host);
 		var file = Tora.inst.resolveHost(host);
