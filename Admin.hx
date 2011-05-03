@@ -86,7 +86,8 @@ class Admin {
 		w('<style type="text/css">');
 		w("body, td, th { font-size : 8pt; font-family : monospace; }");
 		w("h1, a.tab { font-size : 20pt; margin-top : 5px; margin-bottom : 5px; }");
-		w("a.tab { color : black; font-weight : bold; text-decoration : none; margin-right : 30px; }");
+		w("a { color : black; text-decoration : none; }");
+		w("a.tab { font-weight : bold; margin-right : 30px; }");
 		w("table { border-collapse : collapse; border-spacing : 0; margin-left : 30px; }");
 		w("ul { margin-top : 5px; margin-bottom : 5px; }");
 		w("tr { margin : 0; padding : 0; }");
@@ -172,11 +173,14 @@ class Admin {
 		});
 
 		tab("Threads",function() {
-			var count = 1;
+			var count = 0;
 			table(
 				["TID","Hits","E","Status","Time"],
 				infos.threads,
-				function(t:ThreadInfos) return [count++,t.hits,t.errors,if( t.file == null ) "idle" else t.url,fmt(t.time)+"s"]
+				function(t:ThreadInfos) {
+					var tid = count++;
+					return ['<a href="?command=thread;p='+tid+'">'+(tid+1)+'</a>', t.hits, t.errors, if( t.file == null ) "idle" else t.url, fmt(t.time) + "s"];
+				}
 			);
 		});
 

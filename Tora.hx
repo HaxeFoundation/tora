@@ -586,6 +586,43 @@ class Tora {
 			}
 			neko.Lib.println("Total : "+Math.ceil(total/1024)+" KB<br>");
 			ModToraApi.shares_lock.release();
+		case "thread":
+			var t = threads[Std.parseInt(param)];
+			if( t == null ) throw "No such thread";
+			var c = t.client;
+			var inf = [
+				"Thread " + (t.id + 1),
+				"URL " + (c == null ? "idle" : c.getURL()),
+			];
+			if( c != null ) {
+				inf.push("Host " + c.hostName);
+				inf.push("GET " + c.getParams);
+				if( c.postData != null )
+					inf.push("POST " + StringTools.urlEncode(c.postData));
+				inf.push("Headers:");
+				for( h in c.headers )
+					inf.push("\t" + h.k + ": " + h.v);
+				try {
+					var s = untyped haxe.Stack.makeStack(neko.Lib.load("std", "thread_stack", 1)(untyped t.t.handle));
+					inf.push("Stack:");
+					var selts = haxe.Stack.toString(s).split("\n");
+					if( selts[0] == "" ) selts.shift();
+					for( s in selts )
+						inf.push("\t" + s);
+				} catch( e : Dynamic ) {
+					inf.push("Stack not available");
+				}
+			}
+			var lines = StringTools.htmlEscape(inf.join("\n")).split("\n");
+			for( i in 0...lines.length ) {
+				var li = lines[i];
+				if( li.charCodeAt(0) != "\t".code ) {
+					var parts = li.split(" ");
+					var w = parts.shift();
+					lines[i] = "<b>" + w + "</b> " + parts.join(" ");
+				}
+			}
+			neko.Lib.println(lines.join("<br>").split("\t").join("&nbsp; &nbsp; "));
 		default:
 			throw "No such command '"+cmd+"'";
 		}
