@@ -1,3 +1,6 @@
+2011-05-03 : 1.5
+	added thread infos access with current stack
+
 2010-12-22 : 1.4
 	added tora.Api.setCron
 	added tora.Api.getExports
