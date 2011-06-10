@@ -513,7 +513,6 @@ class Tora {
 			throw "Failed to bind socket : invalid host or port is busy";
 		}
 		s.listen(100);
-		ports.push(port);
 		try {
 			while( running ) {
 				var sock = s.accept();
@@ -760,7 +759,9 @@ class Tora {
 			case "-unsafe":
 				var hp = value().split(":");
 				if( hp.length != 2 ) throw "Unsafe format should be host:port";
-				unsafe.add({ host : hp[0], port : Std.parseInt(hp[1]) });
+				var port = Std.parseInt(hp[1]);
+				inst.ports.push(port);
+				unsafe.add({ host : hp[0], port : port });
 			default: throw "Unknown argument "+kind;
 			}
 		}
