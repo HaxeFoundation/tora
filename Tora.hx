@@ -699,7 +699,9 @@ class Tora {
 				switch( cmd.shift().toLowerCase() ) {
 				case "documentroot":
 					var path = cmd.join(" ");
-					if( path.length > 0 && path.charAt(path.length-1) != "/" && path.charAt(path.length-1) != "\\" )
+					// replace all \ by / (same as apache)
+					path = path.split("\\").join("/");
+					if( path.length > 0 && path.charAt(path.length-1) != "/" )
 						path += "/";
 					root = path+"index.n";
 				case "servername", "serveralias": names = names.concat(cmd);
