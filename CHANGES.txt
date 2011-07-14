@@ -1,3 +1,7 @@
+2011-07-14 : 1.6
+	removed Queue.listen, added Queue.addHandler()
+	make sure that queue events are synchronized and allow code hotswap
+
 2011-05-03 : 1.5
 	added thread infos access with current stack
 

@@ -25,8 +25,9 @@ typedef Share = {
 
 typedef Queue = {
 	var name : String;
+	var file : String;
 	var lock : neko.vm.Mutex;
-	var clients : List<Client>;
+	var clients : List<{ c : Client, h : Dynamic, cl : String }>;
 }
 
 class NullClient extends Client {
@@ -47,14 +48,6 @@ class NullClient extends Client {
 	}
 
 	override public function sendMessage( code : tora.Code, msg ) {
-		switch( code ) {
-		case CPrint:
-		case CError, CExecute: onExecute();
-		default:
-		}
-	}
-
-	public dynamic function onExecute() {
 	}
 
 }
@@ -62,18 +55,8 @@ class NullClient extends Client {
 
 class ModToraApi extends ModNekoApi {
 
-	// keep a list of clients in case the module is updated
-	public var listening : List<Client>;
-	public var lock : neko.vm.Mutex;
-
 	public var module : neko.vm.Module;
 	public var time : Float;
-
-	public function new(client) {
-		super(client);
-		listening = new List();
-		lock = new neko.vm.Mutex();
-	}
 
 	// tora-specific
 
@@ -114,10 +97,14 @@ class ModToraApi extends ModNekoApi {
 		// slow path : make an async request on /
 		var c = new NullClient(file, host, "/");
 		var lock = new neko.vm.Lock();
-		c.onExecute = function() lock.release();
+		var usedApi = null;
+		c.onRequestDone = function(api) {
+			usedApi = api;
+			lock.release();
+		};
 		Tora.inst.handleRequest(c);
 		lock.wait();
-		return c.usedAPI.module.exportsTable();
+		return usedApi.module.exportsTable();
 	}
 
 	// shares
@@ -216,6 +203,7 @@ class ModToraApi extends ModNekoApi {
 		if( q == null ) {
 			q = {
 				name : name,
+				file : client.file,
 				lock : new neko.vm.Mutex(),
 				clients : new List(),
 			};
@@ -224,40 +212,114 @@ class ModToraApi extends ModNekoApi {
 		queues_lock.release();
 		return q;
 	}
-
-	function queue_listen( q : Queue, onNotify, onStop ) {
-		if( client.notifyApi != null )
-			throw neko.NativeString.ofString("Can't listen on several queues");
-		if( this.main == null )
-			throw neko.NativeString.ofString("Can't listen on not cached module");
-		client.notifyApi = this;
-		client.notifyQueue = q;
-		client.onNotify = onNotify;
-		var me = this;
-		client.onStop = onStop;
-		// add to listeners
-		lock.acquire();
-		listening.add(client);
-		lock.release();
-		// add to queue
-		q.lock.acquire();
-		q.clients.add(client);
+	
+	function queue_add_handler( q : Queue, h : { } ) {
+		if( q.file != client.file )
+			throw neko.NativeString.ofString("You can't add an handler on a queue created from a different module");
+		var h = Reflect.copy(h);
+		var cl = Type.getClassName(Type.getClass(h));
+		if( cl == null )
+			throw neko.NativeString.ofString("Invalid handler");
+		cl = Std.string(cl); // use our local String class
+		setProto(h, null);
 		if( client.writeLock == null )
 			client.writeLock = new neko.vm.Mutex();
+		if( client.queues == null )
+			client.queues = new List();
+		client.writeLock.acquire();
+		if( client.needClose ) {
+			client.writeLock.release();
+			return; // cancel
+		}
+		client.queues.add(q);
+		client.writeLock.release();
+		q.lock.acquire();
+		q.clients.add({ c : client, h : h, cl : cl });
 		q.lock.release();
 	}
-
+	
+	inline function setProto( h : Dynamic, p : Dynamic ) {
+		untyped __dollar__objsetproto(h, p);
+	}
+	
 	function queue_notify( q : Queue, message : Dynamic ) {
+		if( q.file != client.file )
+			throw neko.NativeString.ofString("You can't notify on a queue created from a different module");
 		q.lock.acquire();
-		var old = this.client, oldapi = client.notifyApi;
-		client.notifyApi = this;
-		for( c in q.clients ) {
+		var old = client;
+		var clname = null, cl : Dynamic = null;
+		for( qc in q.clients ) {
+			if( qc.c.needClose ) continue;
+			if( qc.cl != clname ) {
+				clname = qc.cl;
+				cl = Reflect.field(module.exportsTable(),"__classes");
+				for( p in clname.split(".") )
+					cl = Reflect.field(cl, p);
+			}
+			var handler = qc.h;
+			var c = qc.c;
 			client = c;
-			Tora.inst.handleNotify(c,message);
+			if( cl == null )
+				c.needClose = true;
+			else try {
+				setProto(handler, cl.prototype);
+				handler.onNotify(message);
+				setProto(handler, null);
+			} catch( e : Dynamic ) {
+				var data = try {
+					var stack = haxe.Stack.callStack().concat(haxe.Stack.exceptionStack());
+					Std.string(e) + haxe.Stack.toString(stack);
+				} catch( _ : Dynamic ) "???";
+				try {
+					c.sendMessage(tora.Code.CError,data);
+				} catch( _ : Dynamic ) {
+					c.needClose = true;
+				}
+			}
+			if( c.needClose )
+				Tora.inst.close(c, true);
 		}
 		client = old;
-		client.notifyApi = oldapi;
 		q.lock.release();
+	}
+	
+	/*
+		remove all closed clients from queues and call stop handlers
+	*/
+	public function cleanClients( clients : List<Client> ) {
+		var old = client;
+		var clname = null, cl : Dynamic = null;
+		for( c in clients ) {
+			for( q in c.queues ) {
+				q.lock.acquire();
+				for( qc in q.clients ) {
+					if( !qc.c.closed )
+						continue;
+					q.clients.remove(qc);
+					if( qc.cl != clname ) {
+						clname = qc.cl;
+						cl = Reflect.field(module.exportsTable(),"__classes");
+						for( p in clname.split(".") )
+							cl = Reflect.field(cl, p);
+					}
+					if( cl == null )
+						continue;
+					var handler = qc.h;
+					var c = qc.c;
+					client = c;
+					try {
+						setProto(handler, cl.prototype);
+						handler.onStop();
+					} catch( e : Dynamic ) {
+						var stack = haxe.Stack.toString(haxe.Stack.exceptionStack());
+						var data = try Std.string(e) catch( _ : Dynamic ) "???";
+						Tora.log(data + stack);
+					}
+				}
+				q.lock.release();
+			}
+		}
+		client = old;
 	}
 
 	function queue_count( q : Queue ) {
@@ -265,26 +327,20 @@ class ModToraApi extends ModNekoApi {
 	}
 
 	function queue_stop( q : Queue ) {
-		// if we are inside a onNotify/onStop, queue_stop is a closure on the API the module
-		// was initialized with, which is not the current thread API.
-		// we then need to fetch our real client
-		// Note : only print (per-thread) and queue_stop (with above fix)
-		// are working correctly in onNotify/onStop
-		var client = Tora.inst.getCurrentClient().notifyApi.client;
-		if( client.notifyQueue != q )
-			throw neko.NativeString.ofString("You can't stop on a queue you're not waiting");
-		q.lock.acquire(); // we should already have it, but in case...
-		q.clients.remove(client);
-		client.onNotify = null;
-		client.onStop = null;
-		try client.sendMessage(tora.Code.CExecute,"") catch( e : Dynamic) {};
-		client.needClose = true;
+		q.lock.acquire();
+		for( qc in q.clients )
+			if( qc.c == client )
+				q.clients.remove(qc);
 		q.lock.release();
-		// the api might be different than 'this'
-		var api = client.notifyApi;
-		api.lock.acquire();
-		api.listening.remove(client);
-		api.lock.release();
+		
+		client.writeLock.acquire();
+		client.queues.remove(q);
+		client.writeLock.release();
+		
+		if( client.queues.length == 0 ) {
+			client.needClose = true;
+			Tora.inst.close(client, true);
+		}
 	}
 
 }

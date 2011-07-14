@@ -1,3 +1,19 @@
+#if neko
+typedef Msg = { n : Int, cl : Int };
+class TestHandler extends tora.Handler<Msg> {
+	
+	override function onNotify( v : Msg ) {
+		if( v.n == 0 ) tora.Queue.get("test").stop();
+		neko.Lib.println(v.n+"#"+v.cl);
+	}
+	
+	override function onStop() {
+		neko.Web.logMessage("STOP");
+	}
+	
+}
+#end
+
 class Test {
 
 	static var persist = new Array();
@@ -68,17 +84,14 @@ class Test {
 		neko.Web.cacheModule(main);
 		neko.Web.setHeader("Content-Type","text/plain");
 		var params = neko.Web.getParams();
-		var q = new tora.Queue<{ n : Int, cl : Int }>("test");
+		var q : tora.Queue<{ n : Int, cl : Int }> = tora.Queue.get("test");
 		if( params.exists("wait") ) {
 			neko.Lib.println("WAIT");
-			q.listen(function(v) {
-				if( v.n == 0 ) q.stop();
-				neko.Lib.println(v.n+"#"+v.cl);
-			});
+			q.addHandler(new TestHandler());
 		} else {
 			var k = Std.random(1000);
 			var cl = Std.parseInt(neko.Web.getParams().get("client"));
-			neko.Sys.sleep(0.2);
+			//neko.Sys.sleep(0.05); // 50ms pause (network latency simul)
 			q.notify({ n : k, cl : cl });
 			neko.Lib.println("SEND "+k+" TO "+q.count()+" FROM #"+cl);
 		}

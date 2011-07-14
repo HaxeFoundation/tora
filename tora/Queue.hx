@@ -21,14 +21,11 @@ class Queue<T> {
 	var q : Dynamic;
 	public var name(default,null) : String;
 
-	public function new( name : String ) {
-		init();
-		this.name = name;
-		q = queue_init(untyped name.__s);
+	function new() {
 	}
 
-	public function listen( onNotify : T -> Void, ?onStop : Void -> Void ) {
-		queue_listen(q,onNotify,onStop);
+	public function addHandler( h : Handler<T> ) {
+		queue_add_handler(q,h);
 	}
 
 	public function notify( message : T ) {
@@ -42,20 +39,24 @@ class Queue<T> {
 	public function stop() : Void {
 		queue_stop(q);
 	}
-
-	static function init() {
-		if( queue_init != null ) return;
-		queue_init = neko.Lib.load(Api.lib,"queue_init",1);
-		queue_listen = neko.Lib.load(Api.lib,"queue_listen",3);
-		queue_notify = neko.Lib.load(Api.lib,"queue_notify",2);
-		queue_count = neko.Lib.load(Api.lib,"queue_count",1);
-		queue_stop = neko.Lib.load(Api.lib,"queue_stop",1);
+	
+	public static function get<T>( name ) : Queue<T> {
+		if( queue_init == null ) {
+			queue_init = neko.Lib.load(Api.lib,"queue_init",1);
+			queue_add_handler = neko.Lib.load(Api.lib,"queue_add_handler",2);
+			queue_notify = neko.Lib.load(Api.lib,"queue_notify",2);
+			queue_count = neko.Lib.load(Api.lib,"queue_count",1);
+			queue_stop = neko.Lib.load(Api.lib, "queue_stop", 1);
+		}
+		var q = new Queue();
+		q.name = name;
+		q.q = queue_init(untyped name.__s);
+		return q;
 	}
 
-	static var queue_init = null;
-	static var queue_listen;
+	static var queue_init;
+	static var queue_add_handler;
 	static var queue_notify;
 	static var queue_count;
 	static var queue_stop;
-
 }

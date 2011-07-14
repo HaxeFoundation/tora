@@ -45,16 +45,13 @@ class Client {
 	
 	// tora variables
 	public var secure : Bool;
-	public var usedAPI : ModToraApi;
-	public var onNotify : Dynamic -> Void;
-	public var onStop : Void -> Void;
-	public var notifyApi : ModToraApi;
-	public var notifyQueue : Queue;
+	public var queues : List<Queue>;
 	public var waitingShare : Share;
 	public var lockedShares : List<Share>;
 	public var writeLock : neko.vm.Mutex;
 	public var needClose : Bool;
-	public var handlingMessage : Bool;
+	public var closed : Bool;
+	public var inSocketList : Bool;
 
 	var key : String;
 
@@ -131,6 +128,10 @@ class Client {
 		if( needClose ) return;
 		if( writeLock != null ) {
 			writeLock.acquire();
+			if( needClose ) {
+				writeLock.release();
+				return;
+			}
 			try {
 				o.writeByte( Type.enumIndex(code) + 1 );
 				o.writeUInt24( msg.length );
@@ -187,6 +188,9 @@ class Client {
 		if( h == null ) h = "???";
 		if( u == null ) u = "/???";
 		return h + u;
+	}
+	
+	public dynamic function onRequestDone( api : ModToraApi ) {
 	}
 
 }
