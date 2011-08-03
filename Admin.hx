@@ -78,6 +78,10 @@ class Admin {
 		w('</script>');
 	}
 
+	static function link( link, text ) {
+		return '<a href="'+link+'">'+text+'</a>';
+	}
+
 	static function main() {
 
 		w("<html>");
@@ -111,7 +115,7 @@ class Admin {
 		w("</head>");
 		w("<body>");
 
-		title("Tora Admin");
+		title(link("?","Tora Admin"));
 
 		var params = neko.Web.getParams();
 		var cmd = params.get("command");
@@ -179,7 +183,7 @@ class Admin {
 				infos.threads,
 				function(t:ThreadInfos) {
 					var tid = count++;
-					return ['<a href="?command=thread;p='+tid+'">'+(tid+1)+'</a>', t.hits, t.errors, if( t.file == null ) "idle" else t.url, fmt(t.time) + "s"];
+					return [link("?command=thread;p="+tid,Std.string(tid+1)), t.hits, t.errors, if( t.file == null ) "idle" else t.url, fmt(t.time) + "s"];
 				}
 			);
 		});
