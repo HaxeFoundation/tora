@@ -25,7 +25,6 @@ typedef Share = {
 
 typedef Queue = {
 	var name : String;
-	var file : String;
 	var lock : neko.vm.Mutex;
 	var clients : List<{ c : Client, h : Dynamic, cl : String }>;
 }
@@ -52,6 +51,76 @@ class NullClient extends Client {
 
 }
 
+class ModuleContext {
+	
+	var oldClient : Client;
+	var api : ModToraApi;
+	var curProto : Dynamic;
+	var curClass : String;
+	var curModule : neko.vm.Module;
+	var curFile : String;
+	var instances : Hash<ModToraApi>;
+	
+	public function new(api) {
+		this.api = api;
+		oldClient = api.client;
+		curFile = api.client.file;
+		curModule = api.module;
+	}
+	
+	public function restore() {
+		api.client = oldClient;
+		// put back used instances to cache
+		if( instances != null )
+			for( i in instances )
+				i.client.onRequestDone(null);
+	}
+	
+	public function initHandler( q : { c : Client, cl : String, h : Dynamic } ) {
+		if( q.c.file != curFile ) {
+			if( q.c.file == oldClient.file ) {
+				curFile = oldClient.file;
+				curModule = api.module;
+			} else {
+				var inst = null;
+				if( instances == null )
+					instances = new Hash();
+				else
+					inst = instances.get(q.c.file);
+				if( inst == null ) {
+					inst = Tora.inst.getInstance(q.c.file, q.c.hostName);
+					if( inst == null )
+						return null;
+					instances.set(q.c.file, inst);
+				}
+				
+			}
+			curClass = null;
+		}
+		if( curClass != q.cl ) {
+			curClass = q.cl;
+			var pl = Reflect.field(curModule.exportsTable(), "__classes");
+			for( p in q.cl.split(".") )
+				pl = Reflect.field(pl, p);
+			curProto = pl == null ? null : pl.prototype;
+		}
+		if( curProto == null )
+			return false;
+		api.client = q.c;
+		setProto(q.h, curProto);
+		return true;
+	}
+	
+	public inline function resetHandler( q : { h : Dynamic } ) {
+		setProto(q.h, null);
+	}
+	
+	inline function setProto( h : Dynamic, p : Dynamic ) {
+		untyped __dollar__objsetproto(h, p);
+	}
+	
+	
+}
 
 class ModToraApi extends ModNekoApi {
 
@@ -203,7 +272,6 @@ class ModToraApi extends ModNekoApi {
 		if( q == null ) {
 			q = {
 				name : name,
-				file : client.file,
 				lock : new neko.vm.Mutex(),
 				clients : new List(),
 			};
@@ -214,14 +282,12 @@ class ModToraApi extends ModNekoApi {
 	}
 	
 	function queue_add_handler( q : Queue, h : { } ) {
-		if( q.file != client.file )
-			throw neko.NativeString.ofString("You can't add an handler on a queue created from a different module");
 		var h = Reflect.copy(h);
 		var cl = Type.getClassName(Type.getClass(h));
 		if( cl == null )
 			throw neko.NativeString.ofString("Invalid handler");
 		cl = Std.string(cl); // use our local String class
-		setProto(h, null);
+		new ModuleContext(this).resetHandler({ h : h });
 		if( client.writeLock == null )
 			client.writeLock = new neko.vm.Mutex();
 		if( client.queues == null )
@@ -238,48 +304,31 @@ class ModToraApi extends ModNekoApi {
 		q.lock.release();
 	}
 	
-	inline function setProto( h : Dynamic, p : Dynamic ) {
-		untyped __dollar__objsetproto(h, p);
-	}
-	
 	function queue_notify( q : Queue, message : Dynamic ) {
-		if( q.file != client.file )
-			throw neko.NativeString.ofString("You can't notify on a queue created from a different module");
 		q.lock.acquire();
-		var old = client;
-		var clname = null, cl : Dynamic = null;
+		var ctx = new ModuleContext(this);
 		for( qc in q.clients ) {
 			if( qc.c.needClose ) continue;
-			if( qc.cl != clname ) {
-				clname = qc.cl;
-				cl = Reflect.field(module.exportsTable(),"__classes");
-				for( p in clname.split(".") )
-					cl = Reflect.field(cl, p);
-			}
-			var handler = qc.h;
-			var c = qc.c;
-			client = c;
-			if( cl == null )
-				c.needClose = true;
-			else try {
-				setProto(handler, cl.prototype);
-				handler.onNotify(message);
-				setProto(handler, null);
+			if( !ctx.initHandler(qc) )
+				qc.c.needClose = true;
+			try {
+				qc.h.onNotify(message);
 			} catch( e : Dynamic ) {
 				var data = try {
 					var stack = haxe.Stack.callStack().concat(haxe.Stack.exceptionStack());
 					Std.string(e) + haxe.Stack.toString(stack);
 				} catch( _ : Dynamic ) "???";
 				try {
-					c.sendMessage(tora.Code.CError,data);
+					qc.c.sendMessage(tora.Code.CError,data);
 				} catch( _ : Dynamic ) {
-					c.needClose = true;
+					qc.c.needClose = true;
 				}
 			}
-			if( c.needClose )
-				Tora.inst.close(c, true);
+			ctx.resetHandler(qc);
+			if( qc.c.needClose )
+				Tora.inst.close(qc.c, true);
 		}
-		client = old;
+		ctx.restore();
 		q.lock.release();
 	}
 	
@@ -287,8 +336,7 @@ class ModToraApi extends ModNekoApi {
 		remove all closed clients from queues and call stop handlers
 	*/
 	public function cleanClients( clients : List<Client> ) {
-		var old = client;
-		var clname = null, cl : Dynamic = null;
+		var ctx = new ModuleContext(this);
 		for( c in clients ) {
 			for( q in c.queues ) {
 				q.lock.acquire();
@@ -296,30 +344,19 @@ class ModToraApi extends ModNekoApi {
 					if( !qc.c.closed )
 						continue;
 					q.clients.remove(qc);
-					if( qc.cl != clname ) {
-						clname = qc.cl;
-						cl = Reflect.field(module.exportsTable(),"__classes");
-						for( p in clname.split(".") )
-							cl = Reflect.field(cl, p);
-					}
-					if( cl == null )
-						continue;
-					var handler = qc.h;
-					var c = qc.c;
-					client = c;
-					try {
-						setProto(handler, cl.prototype);
-						handler.onStop();
-					} catch( e : Dynamic ) {
-						var stack = haxe.Stack.toString(haxe.Stack.exceptionStack());
-						var data = try Std.string(e) catch( _ : Dynamic ) "???";
-						Tora.log(data + stack);
-					}
+					if( ctx.initHandler(qc) )
+						try {
+							qc.h.onStop();
+						} catch( e : Dynamic ) {
+							var stack = haxe.Stack.toString(haxe.Stack.exceptionStack());
+							var data = try Std.string(e) catch( _ : Dynamic ) "???";
+							Tora.log(data + stack);
+						}
 				}
 				q.lock.release();
 			}
 		}
-		client = old;
+		ctx.restore();
 	}
 
 	function queue_count( q : Queue ) {

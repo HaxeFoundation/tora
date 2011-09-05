@@ -361,6 +361,40 @@ class Tora {
 		return f;
 	}
 	
+	public function getInstance( file : String, host : String ) {
+		var f = getFile(file);
+		
+		// fast path : get from cache
+		f.lock.acquire();
+		var time = getFileTime(file);
+		var api = if( time == f.filetime ) f.cache.pop() else null;
+		f.lock.release();
+		
+		// at the end of the request, put back to cache
+		var nc = new ModToraApi.NullClient(file, host, "/");
+		nc.onRequestDone = function(_) {
+			f.lock.acquire();
+			api.client = null;
+			if( api.main != null && f.filetime == time )
+				f.cache.add(api);
+			f.lock.release();
+		};
+		
+		if( api != null ) {
+			api.client = nc;
+			return api;
+		}
+		
+		// slow path : load a new instance
+		api = new ModToraApi(nc);
+		redirect(api.print);
+		try {
+			initLoader(api).loadModule(file);
+		} catch( e : Dynamic ) {
+		}
+		return api;
+	}
+	
 	function threadLoop( t : ThreadData ) {
 		tls.value = t;
 		set_trusted(true);
