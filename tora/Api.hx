@@ -31,13 +31,26 @@ class Api {
 	public static function unsafeRequest() : Bool {
 		return unsafe_request();
 	}
-	
+
 	public static function setCron( url : String, delay : Float ) {
 		neko.Lib.load(lib, "tora_set_cron", 2)(untyped url.__s, delay);
 	}
-	
+
 	public static function getExports( host : String ) : Dynamic {
 		return neko.Lib.load(lib, "tora_get_exports", 1)(untyped host.__s);
+	}
+
+	public static function getURL( host : String, uri : String, params : Hash<String> ) {
+		if( !neko.Web.isTora ) {
+			var h = new haxe.Http("http://" + host + uri);
+			for( p in params.keys() )
+				h.setParameter(p, params.get(p));
+			var data = "NO DATA";
+			h.onData = function(d) data = d;
+			h.request(false);
+			return data;
+		}
+		return neko.Lib.load(lib,"tora_get_url",3)(untyped host.__s,untyped uri.__s,params);
 	}
 
 	static var _ =  {

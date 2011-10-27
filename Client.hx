@@ -52,6 +52,7 @@ class Client {
 	public var needClose : Bool;
 	public var closed : Bool;
 	public var inSocketList : Bool;
+	public var lockStatus : Null<String>;
 
 	var key : String;
 

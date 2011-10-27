@@ -183,7 +183,7 @@ class Admin {
 				infos.threads,
 				function(t:ThreadInfos) {
 					var tid = count++;
-					return [link("?command=thread;p="+tid,Std.string(tid+1)), t.hits, t.errors, if( t.file == null ) "idle" else t.url, fmt(t.time) + "s"];
+					return [link("?command=thread;p="+tid,Std.string(tid+1)), t.hits, t.errors, if( t.file == null ) "idle" else t.url + (t.lock == null ? "" : " ("+t.lock+")"), fmt(t.time) + "s"];
 				}
 			);
 		});

@@ -26,6 +26,7 @@ typedef ThreadData = {
 	var hits : Int;
 	var errors : Int;
 	var stopped : Bool;
+	var queue : neko.vm.Deque<Client>;
 }
 
 typedef FileData = {
@@ -51,6 +52,7 @@ typedef Timer = {
 class Tora {
 
 	var clientQueue : neko.vm.Deque<Client>;
+	var debugQueue : neko.vm.Deque<Client>;
 	var pendingSocks : neko.vm.Deque<Client>;
 	var threads : Array<ThreadData>;
 	var startTime : Float;
@@ -99,16 +101,22 @@ class Tora {
 		set_trusted = neko.Lib.load("std","set_trusted",1);
 		enable_jit = neko.Lib.load("std","enable_jit",1);
 		jit = (enable_jit(null) == true);
-		neko.vm.Thread.create(callback(startup,nthreads));
+		neko.vm.Thread.create(callback(startup,nthreads,clientQueue));
 		neko.vm.Thread.create(socketsLoop);
 		neko.vm.Thread.create(speedDelayLoop);
 	}
 
-	function startup( nthreads : Int ) {
+	function startup( nthreads : Int, queue ) {
 		// don't start all threads immediatly : this prevent allocating
 		// too many instances because we have too many concurent requests
 		// when a server get restarted
 		for( i in 0...nthreads ) {
+			if( i > 1 )
+				while( true ) {
+					neko.Sys.sleep(0.5);
+					if( totalHits > i * 10 )
+						break;
+				}
 			var inf : ThreadData = {
 				id : i,
 				t : null,
@@ -117,14 +125,10 @@ class Tora {
 				errors : 0,
 				time : haxe.Timer.stamp(),
 				stopped : false,
+				queue : queue,
 			};
 			inf.t = neko.vm.Thread.create(callback(threadLoop,inf));
 			threads.push(inf);
-			while( true ) {
-				neko.Sys.sleep(0.5);
-				if( totalHits > i * 10 )
-					break;
-			}
 		}
 	}
 
@@ -399,7 +403,7 @@ class Tora {
 		tls.value = t;
 		set_trusted(true);
 		while( true ) {
-			var client = clientQueue.pop(true);
+			var client = t.queue.pop(true);
 			if( client == null ) {
 				// let other threads pop 'null' as well
 				// in case of global restart
@@ -506,7 +510,7 @@ class Tora {
 		}
 	}
 
-	function run( host : String, port : Int, secure : Bool ) {
+	function run( host : String, port : Int, secure : Bool, ?debug : Bool ) {
 		var s = new neko.net.Socket();
 		try {
 			s.bind(new neko.net.Host(host),port);
@@ -517,7 +521,10 @@ class Tora {
 		try {
 			while( running ) {
 				var sock = s.accept();
-				handleRequest(new Client(sock,secure));
+				if( debug )
+					debugQueue.add(new Client(sock, true));
+				else
+					handleRequest(new Client(sock,secure));
 			}
 		} catch( e : Dynamic ) {
 			log("accept() failure : maybe too much FD opened ?");
@@ -633,12 +640,16 @@ class Tora {
 		var tot = 0;
 		for( t in threads ) {
 			var cur = t.client;
+			var lock = if( cur == null ) null else cur.lockStatus;
+			var ws = if( cur == null ) null else cur.waitingShare;
+			if( ws != null ) lock = "Waiting for share " + ws.name;
 			var ti : ThreadInfos = {
 				hits : t.hits,
 				errors : t.errors,
 				file : (cur == null) ? null : (cur.file == null ? "???" : cur.file),
 				url : (cur == null) ? null : cur.getURL(),
 				time : (haxe.Timer.stamp() - t.time),
+				lock : lock,
 			};
 			tot += t.hits;
 			tinf.push(ti);
@@ -745,6 +756,7 @@ class Tora {
 		var args = neko.Sys.args();
 		var nthreads = 32;
 		var i = 0;
+		var debugPort = null;
 		// skip first argument for haxelib "run"
 		if( args[0] != null && StringTools.endsWith(args[0],"/") )
 			i++;
@@ -765,13 +777,22 @@ class Tora {
 				var port = Std.parseInt(hp[1]);
 				inst.ports.push(port);
 				unsafe.add({ host : hp[0], port : port });
-			default: throw "Unknown argument "+kind;
+			case "-debugPort":
+				debugPort = Std.parseInt(value());
+			default:
+				throw "Unknown argument "+kind;
 			}
 		}
 		inst.init(nthreads);
+		if( debugPort != null ) {
+			log("Opening debug port on " + host + ":" + debugPort);
+			inst.debugQueue = new neko.vm.Deque();
+			inst.startup(1, inst.debugQueue);
+			neko.vm.Thread.create(callback(inst.run, host, debugPort, false, true));
+		}
 		for( u in unsafe ) {
 			log("Opening unsafe port on "+u.host+":"+u.port);
-			neko.vm.Thread.create(callback(inst.run,u.host,u.port,false));
+			neko.vm.Thread.create(callback(inst.run,u.host,u.port,false, false));
 		}
 		log("Starting Tora server on "+host+":"+port+" with "+nthreads+" threads");
 		inst.run(host,port,true);

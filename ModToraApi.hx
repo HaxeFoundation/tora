@@ -31,6 +31,8 @@ typedef Queue = {
 
 class NullClient extends Client {
 
+	public var outBuf : StringBuf;
+	
 	public function new( file : String, host : String, uri : String ) {
 		super(cast { setTimeout : function(_) {}, setFastSend : function(_) {}, close : function() {} },true);
 		this.file = file;
@@ -47,6 +49,10 @@ class NullClient extends Client {
 	}
 
 	override public function sendMessage( code : tora.Code, msg ) {
+		switch( code ) {
+		case CPrint: if( outBuf != null ) outBuf.add(msg);
+		default:
+		}
 	}
 
 }
@@ -174,6 +180,25 @@ class ModToraApi extends ModNekoApi {
 		Tora.inst.handleRequest(c);
 		lock.wait();
 		return usedApi.module.exportsTable();
+	}
+	
+	function tora_get_url( host : neko.NativeString, url : neko.NativeString, params : Hash<String> ) : String {
+		var host = neko.NativeString.toString(host);
+		var file = Tora.inst.resolveHost(host);
+		if( file == null ) throw neko.NativeString.ofString("Unknown host '" + host + "'");
+		var c = new NullClient(file, host, neko.NativeString.toString(url));
+		c.outBuf = new StringBuf();
+		for( p in params.keys() )
+			c.params.add( { k : Std.string(untyped p.__s), v : Std.string(untyped params.get(p).__s) } );
+		var lock = new neko.vm.Lock();
+		c.onRequestDone = function(_) {
+			lock.release();
+		};
+		Tora.inst.handleRequest(c);
+		client.lockStatus = "Waiting for " + host + url;
+		lock.wait();
+		client.lockStatus = null;
+		return c.outBuf.toString();
 	}
 
 	// shares

@@ -22,6 +22,7 @@ typedef ThreadInfos = {
 	var file : String;
 	var url : String;
 	var time : Float;
+	var lock : Null<String>;
 }
 
 typedef FileInfos = {
