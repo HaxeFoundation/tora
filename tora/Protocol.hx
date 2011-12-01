@@ -27,6 +27,9 @@ class Protocol {
 	var port : Int;
 	var lastMessage : Code;
 	var dataLength : Int;
+	#if neko
+	var tmpOut : haxe.io.BytesOutput;
+	#end
 
 	static var CODES : Array<Code> = Lambda.array(Lambda.map(Type.getEnumConstructs(Code),callback(Reflect.field,Code)));
 
@@ -68,6 +71,12 @@ class Protocol {
 		if( uri == "" ) uri = "/";
 		onConnect(null);
 	}
+	
+	public function wait() {
+		#if neko
+		onSocketData(null);
+		#end
+	}	
 
 	public function connect() {
 		#if flash
@@ -81,8 +90,8 @@ class Protocol {
 		#elseif neko
 		sock = new neko.net.Socket();
 		sock.connect(new neko.net.Host(host),port);
+		sock.setFastSend(true);
 		onConnect(null);
-		onSocketData(null);
 		#end
 	}
 
@@ -103,7 +112,7 @@ class Protocol {
 		sock.writeByte(length >> 16);
 		sock.writeUTFBytes(data);
 		#elseif neko
-		var i = sock.output;
+		var i = tmpOut;
 		i.writeByte(Type.enumIndex(code) + 1);
 		var length = data.length;
 		i.writeByte(length & 0xFF);
@@ -115,6 +124,9 @@ class Protocol {
 
 	function onConnect(_) {
 		if( sock == null ) return;
+		#if neko
+		tmpOut = new haxe.io.BytesOutput();
+		#end
 		send(CHostResolve,host);
 		send(CUri,uri);
 		for( h in headers ) {
@@ -132,6 +144,9 @@ class Protocol {
 		send(CExecute,"");
 		#if flash
 		sock.flush();
+		#else
+		sock.write(neko.Lib.stringReference(tmpOut.getBytes()));
+		tmpOut = null;
 		#end
 	}
 
@@ -181,8 +196,7 @@ class Protocol {
 			case CError:
 				error(bytes.toString());
 				return;
-			case CListen:
-			case CExecute:
+			case CListen,CExecute:
 				#if neko
 				break;
 				#end
