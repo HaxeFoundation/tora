@@ -181,6 +181,7 @@ class Tora {
 		var poll = new neko.net.Poll(4096);
 		var socks = new Array();
 		var changed = false;
+		var loopCount = 0;
 		while( true ) {
 			// add new clients
 			while( true ) {
@@ -191,7 +192,7 @@ class Tora {
 					close(client);
 					socks.remove(client.sock);
 				} else {
-					client.sock.custom = client;
+					client.sock.custom = { client : client, last : loopCount };
 					socks.push(client.sock);
 				}
 			}
@@ -202,14 +203,17 @@ class Tora {
 			}
 			// check if some clients sent a message or have been disconnected
 			poll.events(0.05);
+			loopCount++;
+			
 			var i = 0;
 			var toact = null;
 			while( true ) {
 				var idx = poll.readIndexes[i++];
 				if( idx == -1 ) break;
-				var client : Client = socks[idx].custom;
+				var infos : { client : Client, last : Int } = socks[idx].custom;
+				infos.last = loopCount;
 				if( toact == null ) toact = new List();
-				toact.add(client);
+				toact.add(infos.client);
 			}
 			if( toact != null ) {
 				for( c in toact ) {
@@ -226,6 +230,21 @@ class Tora {
 				changed = true;
 				activeConnections = socks.length;
 			}
+			
+			// cleanup inactive sockets (1000000 loops = max 14 hours)
+			if( loopCount >= 1000000 ) {
+				for( s in socks ) {
+					var infos : { client : Client, last : Int } = s.custom;
+					infos.last -= 1000000;
+					if( infos.last < -1000000 ) {
+						socks.remove(s);
+						close(infos.client);
+						changed = true;
+					}
+				}
+				loopCount = 0;
+			}
+			
 		}
 	}
 
