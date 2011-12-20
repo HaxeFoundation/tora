@@ -138,7 +138,7 @@ class Tora {
 		var lastTime = neko.Sys.time(), lastHits = totalHits;
 		while( true ) {
 			var time = neko.Sys.time();
-			delayWait.wait((nextDelay == null) ? 1.0 : nextDelay);
+			delayWait.wait((nextDelay == null) ? 1.0 : nextDelay + 0.01);
 			delayLock.acquire();
 			var dt = neko.Sys.time() - time;
 			var toExecute = null;
@@ -150,7 +150,7 @@ class Tora {
 					if( toExecute == null ) toExecute = new List();
 					toExecute.add(d.callb);
 					if( d.repeat )
-						d.elapsed += d.time;
+						d.elapsed -= d.time;
 					else
 						delayQueue.remove(d);
 				} else {
