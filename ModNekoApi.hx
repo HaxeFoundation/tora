@@ -135,6 +135,7 @@ class ModNekoApi {
 
 	function parse_multipart_data( onPart : NativeString -> NativeString -> Void, onData : NativeString -> Int -> Int -> Void ) {
 		var bufsize = 1 << 16;
+		client.sock.setTimeout(3000); // higher timeout
 		client.sendMessage(CQueryMultipart,Std.string(bufsize));
 		var filename = null;
 		var buffer = haxe.io.Bytes.alloc(bufsize);
@@ -168,6 +169,7 @@ class ModNekoApi {
 				throw "Unexpected "+msg;
 			}
 		}
+		client.sock.setTimeout(3); // return
 		if( error != null )
 			neko.Lib.rethrow(error.r);
 	}
