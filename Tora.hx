@@ -204,7 +204,7 @@ class Tora {
 			// check if some clients sent a message or have been disconnected
 			poll.events(0.05);
 			loopCount++;
-			
+
 			var i = 0;
 			var toact = null;
 			while( true ) {
@@ -230,7 +230,7 @@ class Tora {
 				changed = true;
 				activeConnections = socks.length;
 			}
-			
+
 			// cleanup inactive sockets (1000000 loops = max 14 hours)
 			if( loopCount >= 1000000 ) {
 				for( s in socks ) {
@@ -244,7 +244,7 @@ class Tora {
 				}
 				loopCount = 0;
 			}
-			
+
 		}
 	}
 
@@ -278,7 +278,7 @@ class Tora {
 		c.writeLock.release();
 		// close the socket
 		c.sock.close();
-		
+
 		// store the client in cleanup list
 		var f = getFile(c.file);
 		f.lock.acquire();
@@ -356,7 +356,7 @@ class Tora {
 		delayWait.release(); // signal
 		return t;
 	}
-	
+
 	public function getFile( file : String ) {
 		var f = files.get(file);
 		if( f != null )
@@ -383,16 +383,16 @@ class Tora {
 		flock.release();
 		return f;
 	}
-	
+
 	public function getInstance( file : String, host : String ) {
 		var f = getFile(file);
-		
+
 		// fast path : get from cache
 		f.lock.acquire();
 		var time = getFileTime(file);
 		var api = if( time == f.filetime ) f.cache.pop() else null;
 		f.lock.release();
-		
+
 		// at the end of the request, put back to cache
 		var nc = new ModToraApi.NullClient(file, host, "/");
 		nc.onRequestDone = function(_) {
@@ -402,12 +402,12 @@ class Tora {
 				f.cache.add(api);
 			f.lock.release();
 		};
-		
+
 		if( api != null ) {
 			api.client = nc;
 			return api;
 		}
-		
+
 		// slow path : load a new instance
 		api = new ModToraApi(nc);
 		redirect(api.print);
@@ -415,9 +415,11 @@ class Tora {
 			initLoader(api).loadModule(file);
 		} catch( e : Dynamic ) {
 		}
+		redirect(null);
+
 		return api;
 	}
-	
+
 	function threadLoop( t : ThreadData ) {
 		tls.value = t;
 		set_trusted(true);
@@ -497,9 +499,9 @@ class Tora {
 				t.errors++;
 				client.needClose = true;
 			}
-			
+
 			client.onRequestDone(api);
-			
+
 			// save infos
 			f.lock.acquire();
 			f.time += haxe.Timer.stamp() - t.time;
@@ -596,11 +598,15 @@ class Tora {
 				neko.Lib.println("Host '"+h+"', Root '"+hosts.get(h)+"'<br>");
 		case "share":
 			ModToraApi.shares_lock.acquire();
-			var bytes = neko.Lib.load("std","mem_size",1);
+			var m_size = neko.Lib.load("std","mem_size",1);
+			var m_local_size = try neko.Lib.load("std","mem_local_size",2) catch( e : Dynamic ) null;
+			var tm : neko.NativeArray<Dynamic> = neko.NativeArray.alloc(2);
+			tm[0] = neko.vm.Module.local().m;
+			tm[1] = this;
 			var total = 0;
 			for( s in ModToraApi.shares ) {
 				var c = s.owner;
-				var size = bytes(s.data);
+				var size = if( m_local_size != null ) m_local_size(s.data,tm) else m_size(s.data);
 				total += size;
 				neko.Lib.print("Share '"+s.name+"' "+Math.ceil(size/1024)+" KB");
 				if( c != null ) {
@@ -649,6 +655,77 @@ class Tora {
 				}
 			}
 			neko.Lib.println(lines.join("<br>").split("\t").join("&nbsp; &nbsp; "));
+		case "memory":
+			if( param == null ) {
+				neko.Lib.println("Require p=file");
+				return;
+			}
+			// read the module globals
+			var fp = try neko.io.File.read(param) catch( e : Dynamic ) null;
+			if( fp == null ) {
+				neko.Lib.println("No such file " + StringTools.htmlEscape(param));
+				return;
+			}
+			var gnames = neko.vm.Module.readGlobalsNames(fp);
+			fp.close();
+
+			var inst = getInstance(param, "");
+
+			var m = inst.module;
+			var mclasses : Dynamic = m.getExports().get("__classes");
+			var ignore : neko.NativeArray<Dynamic> = neko.NativeArray.alloc(7);
+			ignore[0] = neko.vm.Module.local().m;
+			ignore[1] = m.m;
+			ignore[2] = this;
+			ignore[3] = mclasses.String.prototype;
+			ignore[4] = mclasses.Array.prototype;
+			ignore[5] = inst;
+			ignore[6] = mclasses.neko.Boot.__classes;
+
+
+			var m_local_size = neko.Lib.load("std", "mem_local_size", 2);
+
+			var mem = new Array();
+			for( i in 0...m.globalsCount() ){
+				if( gnames[i] == "@classes" )
+					continue;
+				var g = m.getGlobal(i);
+				function getMemoryRec(g:Dynamic, name:String, rec:Int) {
+					if( Reflect.isFunction(g) )
+						return;
+					var size : Int = m_local_size(g,ignore);
+					if( size < 1024 )
+						return;
+					if( Type.getEnum(g) != null )
+						return;
+					mem.push({
+						name : name,
+						size : size
+					});
+					if( Reflect.isObject(g) )
+						for( f in Reflect.fields(g) )
+							if( f != "__classes" && f != "__class__" && f != "__super__" && f != "prototype" && f != "class_proto" && f.charAt(0) != "@" && rec < 10 )
+								getMemoryRec(Reflect.field(g,f),name+"."+f,rec+1);
+				}
+				getMemoryRec(g,gnames[i],0);
+			}
+			// put back instance
+			inst.client.onRequestDone(null);
+			mem.sort(function(a, b) return b.size - a.size);
+
+			// print results
+			function hr( i : Int ){
+				return Math.round(i/1024)+"K";
+			}
+			neko.Lib.print("Report for " + m.name + " statics");
+			neko.Lib.print("<table>");
+			neko.Lib.print("<tr><th>Size</th><th>Name</th></tr>");
+			for( e in mem ){
+				neko.Lib.print("<tr><td>"+hr(e.size)+"</td><td>");
+				neko.Lib.print(StringTools.htmlEscape(Std.string(e.name)));
+				neko.Lib.print("</td></tr>");
+			}
+			neko.Lib.print("</table>");
 		default:
 			throw "No such command '"+cmd+"'";
 		}
