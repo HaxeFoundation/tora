@@ -23,7 +23,7 @@ class Client {
 	static var CODES = Type.getEnumConstructs(Code);
 
 	// protocol
-	public var sock : neko.net.Socket;
+	public var sock : sys.net.Socket;
 	public var data : String;
 	public var bytes : Int;
 	public var dataBytes : Int;

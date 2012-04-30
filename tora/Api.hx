@@ -54,7 +54,7 @@ class Api {
 	}
 
 	static var _ =  {
-		var v = neko.Sys.getEnv("MOD_NEKO");
+		var v = Sys.getEnv("MOD_NEKO");
 		if( v == null || v == "1" )
 			v = "";
 		lib = "mod_neko"+v;

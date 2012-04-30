@@ -120,9 +120,9 @@ class Admin {
 		var params = neko.Web.getParams();
 		var cmd = params.get("command");
 		if( cmd != null ) {
-			var t = neko.Sys.time();
+			var t = Sys.time();
 			tora.Api.command(cmd,params.get("p"));
-			w("<p>Command <b>"+cmd+"</b> took "+fmt(neko.Sys.time() - t)+"s to execute</p>");
+			w("<p>Command <b>"+cmd+"</b> took "+fmt(Sys.time() - t)+"s to execute</p>");
 		}
 		var mem = neko.vm.Gc.stats();
 		mem.heap >>>= 10;

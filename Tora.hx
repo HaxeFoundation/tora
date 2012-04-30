@@ -14,7 +14,6 @@
 /* Lesser General Public License or the LICENSE file for more details.		*/
 /*																			*/
 /* ************************************************************************ */
-import neko.net.Socket.SocketHandle;
 import tora.Code;
 import tora.Infos;
 
@@ -96,7 +95,7 @@ class Tora {
 	}
 
 	function init( nthreads : Int ) {
-		neko.Sys.putEnv("MOD_NEKO","1");
+		Sys.putEnv("MOD_NEKO","1");
 		redirect = neko.Lib.load("std","print_redirect",1);
 		set_trusted = neko.Lib.load("std","set_trusted",1);
 		enable_jit = neko.Lib.load("std","enable_jit",1);
@@ -113,7 +112,7 @@ class Tora {
 		for( i in 0...nthreads ) {
 			if( i > 1 )
 				while( true ) {
-					neko.Sys.sleep(0.5);
+					Sys.sleep(0.5);
 					if( totalHits > i * 10 )
 						break;
 				}
@@ -135,12 +134,12 @@ class Tora {
 	// measuring speed and processing delayed events
 	function speedDelayLoop() {
 		var nextDelay = null;
-		var lastTime = neko.Sys.time(), lastHits = totalHits;
+		var lastTime = Sys.time(), lastHits = totalHits;
 		while( true ) {
-			var time = neko.Sys.time();
+			var time = Sys.time();
 			delayWait.wait((nextDelay == null) ? 1.0 : nextDelay + 0.01);
 			delayLock.acquire();
-			var dt = neko.Sys.time() - time;
+			var dt = Sys.time() - time;
 			var toExecute = null;
 			nextDelay = null;
 			for( d in delayQueue ) {
@@ -166,7 +165,7 @@ class Tora {
 					} catch( e : Dynamic ) {
 						log(Std.string(e)+haxe.Stack.toString(haxe.Stack.exceptionStack()));
 					}
-			dt = neko.Sys.time() - lastTime;
+			dt = Sys.time() - lastTime;
 			if( dt > 1 ) {
 				var hits = Std.int((totalHits - lastHits) / dt);
 				recentHits = Math.ceil(recentHits * 0.5 + hits * 0.5);
@@ -340,7 +339,7 @@ class Tora {
 	}
 
 	public function getFileTime( file ) {
-		return try neko.FileSystem.stat(file).mtime.getTime() catch( e : Dynamic ) 0.;
+		return try sys.FileSystem.stat(file).mtime.getTime() catch( e : Dynamic ) 0.;
 	}
 
 	public function getCurrentClient() {
@@ -532,9 +531,9 @@ class Tora {
 	}
 
 	function run( host : String, port : Int, secure : Bool, ?debug : Bool ) {
-		var s = new neko.net.Socket();
+		var s = new sys.net.Socket();
 		try {
-			s.bind(new neko.net.Host(host),port);
+			s.bind(new sys.net.Host(host),port);
 		} catch( e : Dynamic ) {
 			throw "Failed to bind socket : invalid host or port is busy";
 		}
@@ -571,7 +570,7 @@ class Tora {
 		}
 		log(count + " sockets closed in queue...");
 		// wait for threads to stop
-		neko.Sys.sleep(5);
+		Sys.sleep(5);
 		count = 0;
 		for( t in threads )
 			if( t.stopped )
@@ -661,7 +660,7 @@ class Tora {
 				return;
 			}
 			// read the module globals
-			var fp = try neko.io.File.read(param) catch( e : Dynamic ) null;
+			var fp = try sys.io.File.read(param) catch( e : Dynamic ) null;
 			if( fp == null ) {
 				neko.Lib.println("No such file " + StringTools.htmlEscape(param));
 				return;
@@ -841,7 +840,7 @@ class Tora {
 	}
 
 	public static function log( msg : String ) {
-		neko.io.File.stderr().writeString("["+Date.now().toString()+"] "+msg+"\n");
+		Sys.stderr().writeString("["+Date.now().toString()+"] "+msg+"\n");
 	}
 
 	public static var inst : Tora;
@@ -849,7 +848,7 @@ class Tora {
 	static function main() {
 		var host = "127.0.0.1";
 		var port = 6666;
-		var args = neko.Sys.args();
+		var args = Sys.args();
 		var nthreads = 32;
 		var i = 0;
 		var debugPort = null;
@@ -866,7 +865,7 @@ class Tora {
 			case "-h","-host": host = value();
 			case "-p","-port": port = Std.parseInt(value());
 			case "-t","-threads": nthreads = Std.parseInt(value());
-			case "-config": inst.loadConfig(neko.io.File.getContent(value()));
+			case "-config": inst.loadConfig(sys.io.File.getContent(value()));
 			case "-unsafe":
 				var hp = value().split(":");
 				if( hp.length != 2 ) throw "Unsafe format should be host:port";
