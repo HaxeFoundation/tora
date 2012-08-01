@@ -76,7 +76,7 @@ class Protocol {
 		#if neko
 		onSocketData(null);
 		#end
-	}	
+	}
 
 	public function connect() {
 		#if flash
@@ -151,8 +151,8 @@ class Protocol {
 	}
 
 	function onSocketData(_) {
-		if( sock == null ) return;
 		while( true ) {
+			if( sock == null ) return;
 			#if flash
 			if( lastMessage == null ) {
 				if( sock.bytesAvailable < 4 ) return;
