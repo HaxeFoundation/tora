@@ -96,6 +96,7 @@ class Protocol {
 	}
 
 	public function close() {
+		if( sock == null ) return;
 		#if flash
 		sock.removeEventListener(flash.events.Event.CLOSE,onClose);
 		#end
