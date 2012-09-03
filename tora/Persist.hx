@@ -124,7 +124,7 @@ class Persist<T> {
 				var fields = new Array();
 				var raw = !stm;
 				for( f in a ) {
-					var t = processType(f.t);
+					var t = processType(#if haxe_211 f.type #else f.t #end);
 					if( t != PRaw ) raw = false;
 					fields.push({ name : f.name, t : t });
 				}
