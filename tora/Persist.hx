@@ -143,6 +143,11 @@ class Persist<T> {
 				case "Null": processType(pl.first());
 				default: throw "Unsupported type "+t;
 				}
+			case CAbstract(a,pl):
+				switch( a ) {
+				case "Int", "Float", "Bool": PRaw;
+				default: throw "Unsupported abstract "+a;
+				}
 		};
 	}
 
@@ -195,14 +200,14 @@ class Persist<T> {
 			}
 			case PHashRaw: if( v == null ) null else untyped v.h;
 			case PHash(t): if( v == null ) null else {
-				var a = 0;
+				var a : Dynamic = 0;
 				var me = this;
 				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,me.unwrap(v,t),a));
 				a;
 			}
 			case PIntHashRaw: if( v == null ) null else untyped v.h;
 			case PIntHash(t): if( v == null ) null else {
-				var a = 0;
+				var a : Dynamic = 0;
 				var me = this;
 				untyped __dollar__hiter(v.h,function(k,v) a = untyped __dollar__array(k,me.unwrap(v,t),a));
 				a;
