@@ -40,7 +40,7 @@ class Api {
 		return neko.Lib.load(lib, "tora_get_exports", 1)(untyped host.__s);
 	}
 
-	public static function getURL( host : String, uri : String, params : Hash<String> ) {
+	public static function getURL( host : String, uri : String, params : Map<String,String> ) {
 		if( !neko.Web.isTora ) {
 			var h = new haxe.Http("http://" + host + uri);
 			for( p in params.keys() )

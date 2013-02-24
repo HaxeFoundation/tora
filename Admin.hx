@@ -169,7 +169,7 @@ class Admin {
 			table(
 				["File","Loads","Cache Hits","Instances","KB/hit","ms/hit"],
 				infos.files,
-				function(f:FileInfos) {
+				function(f:FileInfos) : Array<Dynamic> {
 					var tot = f.loads + f.cacheHits;
 					return [f.file,f.loads,f.cacheHits,f.cacheCount,fmt(f.bytes/(1024.0 * tot)),fmt(f.time*1000/tot)];
 				}
@@ -181,7 +181,7 @@ class Admin {
 			table(
 				["TID","Hits","E","Status","Time"],
 				infos.threads,
-				function(t:ThreadInfos) {
+				function(t:ThreadInfos) : Array<Dynamic> {
 					var tid = count++;
 					return [link("?command=thread;p="+tid,Std.string(tid+1)), t.hits, t.errors, if( t.file == null ) "idle" else t.url + (t.lock == null ? "" : " ("+t.lock+")"), fmt(t.time) + "s"];
 				}

@@ -65,7 +65,7 @@ class ModuleContext {
 	var curClass : String;
 	var curModule : neko.vm.Module;
 	var curFile : String;
-	var instances : Hash<ModToraApi>;
+	var instances : Map<String,ModToraApi>;
 	
 	public function new(api) {
 		this.api = api;
@@ -90,7 +90,7 @@ class ModuleContext {
 			} else {
 				var inst = null;
 				if( instances == null )
-					instances = new Hash();
+					instances = new Map();
 				else
 					inst = instances.get(q.c.file);
 				if( inst == null ) {
@@ -182,7 +182,7 @@ class ModToraApi extends ModNekoApi {
 		return usedApi.module.exportsTable();
 	}
 	
-	function tora_get_url( host : neko.NativeString, url : neko.NativeString, params : Hash<String> ) : String {
+	function tora_get_url( host : neko.NativeString, url : neko.NativeString, params : Map<String,String> ) : String {
 		var host = neko.NativeString.toString(host);
 		var file = Tora.inst.resolveHost(host);
 		if( file == null ) throw neko.NativeString.ofString("Unknown host '" + host + "'");
@@ -203,7 +203,7 @@ class ModToraApi extends ModNekoApi {
 
 	// shares
 
-	public static var shares = new Hash<Share>();
+	public static var shares = new Map<String,Share>();
 	public static var shares_lock = new neko.vm.Mutex();
 
 	function share_init( name : neko.NativeString, ?make : Void -> Dynamic ) : Share {
@@ -213,7 +213,7 @@ class ModToraApi extends ModNekoApi {
 			shares_lock.acquire();
 			s = shares.get(name);
 			if( s == null ) {
-				var tmp = new Hash();
+				var tmp = new Map();
 				for( s in shares )
 					tmp.set(s.name,s);
 				s = {
@@ -287,7 +287,7 @@ class ModToraApi extends ModNekoApi {
 
 	// queues
 
-	static var queues = new Hash<Queue>();
+	static var queues = new Map<String,Queue>();
 	static var queues_lock = new neko.vm.Mutex();
 
 	function queue_init( name : neko.NativeString ) : Queue {
@@ -340,8 +340,8 @@ class ModToraApi extends ModNekoApi {
 				qc.h.onNotify(message);
 			} catch( e : Dynamic ) {
 				var data = try {
-					var stack = haxe.Stack.callStack().concat(haxe.Stack.exceptionStack());
-					Std.string(e) + haxe.Stack.toString(stack);
+					var stack = haxe.CallStack.callStack().concat(haxe.CallStack.exceptionStack());
+					Std.string(e) + haxe.CallStack.toString(stack);
 				} catch( _ : Dynamic ) "???";
 				try {
 					qc.c.sendMessage(tora.Code.CError,data);
@@ -373,7 +373,7 @@ class ModToraApi extends ModNekoApi {
 						try {
 							qc.h.onStop();
 						} catch( e : Dynamic ) {
-							var stack = haxe.Stack.toString(haxe.Stack.exceptionStack());
+							var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 							var data = try Std.string(e) catch( _ : Dynamic ) "???";
 							Tora.log(data + stack);
 						}

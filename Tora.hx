@@ -36,7 +36,7 @@ typedef FileData = {
 	var bytes : Float;
 	var time : Float;
 	var lock : neko.vm.Mutex;
-	var cache : haxe.FastList<ModToraApi>;
+	var cache : haxe.ds.GenericStack<ModToraApi>;
 	var cron : Timer;
 	var toClean : List<Client>;
 }
@@ -58,7 +58,7 @@ class Tora {
 	var totalHits : Int;
 	var recentHits : Int;
 	var activeConnections : Int;
-	var files : Hash<FileData>;
+	var files : Map<String,FileData>;
 	var flock : neko.vm.Mutex;
 	var rootLoader : neko.vm.Loader;
 	var modulePath : Array<String>;
@@ -67,7 +67,7 @@ class Tora {
 	var enable_jit : Bool -> Bool;
 	var running : Bool;
 	var jit : Bool;
-	var hosts : Hash<String>;
+	var hosts : Map<String,String>;
 	var ports : Array<Int>;
 	var tls : neko.vm.Tls<ThreadData>;
 	var delayQueue : List<Timer>;
@@ -79,8 +79,8 @@ class Tora {
 		recentHits = 0;
 		running = true;
 		startTime = haxe.Timer.stamp();
-		files = new Hash();
-		hosts = new Hash();
+		files = new Map();
+		hosts = new Map();
 		ports = new Array();
 		tls = new neko.vm.Tls();
 		flock = new neko.vm.Mutex();
@@ -100,7 +100,7 @@ class Tora {
 		set_trusted = neko.Lib.load("std","set_trusted",1);
 		enable_jit = neko.Lib.load("std","enable_jit",1);
 		jit = (enable_jit(null) == true);
-		neko.vm.Thread.create(callback(startup,nthreads,clientQueue));
+		neko.vm.Thread.create(startup.bind(nthreads,clientQueue));
 		neko.vm.Thread.create(socketsLoop);
 		neko.vm.Thread.create(speedDelayLoop);
 	}
@@ -126,7 +126,7 @@ class Tora {
 				stopped : false,
 				queue : queue,
 			};
-			inf.t = neko.vm.Thread.create(callback(threadLoop,inf));
+			inf.t = neko.vm.Thread.create(threadLoop.bind(inf));
 			threads.push(inf);
 		}
 	}
@@ -163,7 +163,7 @@ class Tora {
 					try {
 						f();
 					} catch( e : Dynamic ) {
-						log(Std.string(e)+haxe.Stack.toString(haxe.Stack.exceptionStack()));
+						log(Std.string(e)+haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
 					}
 			dt = Sys.time() - lastTime;
 			if( dt > 1 ) {
@@ -371,7 +371,7 @@ class Tora {
 				loads : 0,
 				cacheHits : 0,
 				lock : new neko.vm.Mutex(),
-				cache : new haxe.FastList<ModToraApi>(),
+				cache : new haxe.ds.GenericStack<ModToraApi>(),
 				bytes : 0.,
 				time : 0.,
 				cron : null,
@@ -460,7 +460,7 @@ class Tora {
 			var time = getFileTime(client.file);
 			if( time != f.filetime ) {
 				f.filetime = time;
-				f.cache = new haxe.FastList<ModToraApi>();
+				f.cache = new haxe.ds.GenericStack<ModToraApi>();
 			}
 			api = f.cache.pop();
 			if( api == null )
@@ -486,7 +486,7 @@ class Tora {
 					code = CListen;
 			} catch( e : Dynamic ) {
 				code = CError;
-				data = try Std.string(e) + haxe.Stack.toString(haxe.Stack.exceptionStack()) catch( _ : Dynamic ) "??? TORA Error";
+				data = try Std.string(e) + haxe.CallStack.toString(haxe.CallStack.exceptionStack()) catch( _ : Dynamic ) "??? TORA Error";
 			}
 			// send result
 			try {
@@ -636,7 +636,7 @@ class Tora {
 				try {
 					var s = untyped haxe.Stack.makeStack(neko.Lib.load("std", "thread_stack", 1)(untyped t.t.handle));
 					inf.push("Stack:");
-					var selts = haxe.Stack.toString(s).split("\n");
+					var selts = haxe.CallStack.toString(s).split("\n");
 					if( selts[0] == "" ) selts.shift();
 					for( s in selts )
 						inf.push("\t" + s);
@@ -883,11 +883,11 @@ class Tora {
 			log("Opening debug port on " + host + ":" + debugPort);
 			inst.debugQueue = new neko.vm.Deque();
 			inst.startup(1, inst.debugQueue);
-			neko.vm.Thread.create(callback(inst.run, host, debugPort, false, true));
+			neko.vm.Thread.create(inst.run.bind(host, debugPort, false, true));
 		}
 		for( u in unsafe ) {
 			log("Opening unsafe port on "+u.host+":"+u.port);
-			neko.vm.Thread.create(callback(inst.run,u.host,u.port,false, false));
+			neko.vm.Thread.create(inst.run.bind(u.host,u.port,false, false));
 		}
 		log("Starting Tora server on "+host+":"+port+" with "+nthreads+" threads");
 		inst.run(host,port,true);
