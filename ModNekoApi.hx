@@ -19,6 +19,8 @@ import tora.Code;
 
 class ModNekoApi {
 
+	static inline var STREAM_CHUNK_SIZE = 1 << 17; // 128KB is the typical TCP send buffer size
+	
 	public var client : Client;
 	public var main : Void -> Void;
 
@@ -192,10 +194,24 @@ class ModNekoApi {
 	// internal APIS
 
 	public function print( value : Dynamic ) {
-		var str = NativeString.toString(untyped if( __dollar__typeof(value) == __dollar__tstring ) value else __dollar__string(value));
+		var str = NativeString.toString(untyped if( $typeof(value) == $tstring ) value else if( $typeof(value) == $tobject && $typeof(value.__class__) == $tobject && value.__class__.__is_String ) value.__s else $string(value));
 		try {
 			client.sendHeaders();
-			client.sendMessage(CPrint,str);
+			if( str.length >= STREAM_CHUNK_SIZE ) {
+				// we are sending a large amount of data, let's wait until it's properly delivered
+				client.sock.setTimeout(STREAM_CHUNK_SIZE / 2048); // except at least 2KB/s transfer
+				var pos = 0, len = str.length;
+				while( len > 0 ) {
+					var send = len < STREAM_CHUNK_SIZE ? len : STREAM_CHUNK_SIZE - 1; // minus one because mod_tora adds a \0
+					client.sendMessageSub(CPrint, str, pos, send);
+					pos += send;
+					len -= send;
+				}
+				// back to normal
+				client.sock.setTimeout(3);
+			} else {
+				client.sendMessage(CPrint,str);
+			}
 			client.dataBytes += str.length;
 		} catch( e : Dynamic ) {
 			// never abort a print, this might cause side effects on the program

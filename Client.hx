@@ -125,6 +125,10 @@ class Client {
 	}
 
 	public function sendMessage( code : Code, msg : String ) {
+		sendMessageSub(code, msg, 0, msg.length);
+	}
+	
+	public function sendMessageSub( code : Code, msg : String, pos : Int, len : Int ) {
 		var o = sock.output;
 		if( needClose ) return;
 		if( writeLock != null ) {
@@ -135,8 +139,8 @@ class Client {
 			}
 			try {
 				o.writeByte( Type.enumIndex(code) + 1 );
-				o.writeUInt24( msg.length );
-				o.writeString( msg );
+				o.writeUInt24( len );
+				o.writeFullBytes( neko.Lib.bytesReference(msg), pos, len );
 			} catch( e : Dynamic ) {
 				writeLock.release();
 				neko.Lib.rethrow(e);
@@ -144,8 +148,8 @@ class Client {
 			writeLock.release();
 		} else {
 			o.writeByte( Type.enumIndex(code) + 1 );
-			o.writeUInt24( msg.length );
-			o.writeString( msg );
+			o.writeUInt24( len );
+			o.writeFullBytes( neko.Lib.bytesReference(msg), pos, len );
 		}
 	}
 
