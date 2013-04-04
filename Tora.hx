@@ -594,7 +594,7 @@ class Tora {
 			flock.release();
 		case "hosts":
 			for( h in hosts.keys() )
-				neko.Lib.println("Host '"+h+"', Root '"+hosts.get(h)+"'<br>");
+				Sys.println("Host '"+h+"', Root '"+hosts.get(h)+"'<br>");
 		case "share":
 			ModToraApi.shares_lock.acquire();
 			var m_size = neko.Lib.load("std","mem_size",1);
@@ -607,15 +607,15 @@ class Tora {
 				var c = s.owner;
 				var size = if( m_local_size != null ) m_local_size(s.data,tm) else m_size(s.data);
 				total += size;
-				neko.Lib.print("Share '"+s.name+"' "+Math.ceil(size/1024)+" KB");
+				Sys.print("Share '"+s.name+"' "+Math.ceil(size/1024)+" KB");
 				if( c != null ) {
-					neko.Lib.print(" locked by "+c.getURL());
+					Sys.print(" locked by "+c.getURL());
 					var ws = c.waitingShare;
-					if( ws != null ) neko.Lib.print(" waiting for "+ws.name);
+					if( ws != null ) Sys.print(" waiting for "+ws.name);
 				}
-				neko.Lib.println("<br>");
+				Sys.println("<br>");
 			}
-			neko.Lib.println("Total : "+Math.ceil(total/1024)+" KB<br>");
+			Sys.println("Total : "+Math.ceil(total/1024)+" KB<br>");
 			ModToraApi.shares_lock.release();
 		case "thread":
 			var t = threads[Std.parseInt(param)];
@@ -653,16 +653,16 @@ class Tora {
 					lines[i] = "<b>" + w + "</b> " + parts.join(" ");
 				}
 			}
-			neko.Lib.println(lines.join("<br>").split("\t").join("&nbsp; &nbsp; "));
+			Sys.println(lines.join("<br>").split("\t").join("&nbsp; &nbsp; "));
 		case "memory":
 			if( param == null ) {
-				neko.Lib.println("Require p=file");
+				Sys.println("Require p=file");
 				return;
 			}
 			// read the module globals
 			var fp = try sys.io.File.read(param) catch( e : Dynamic ) null;
 			if( fp == null ) {
-				neko.Lib.println("No such file " + StringTools.htmlEscape(param));
+				Sys.println("No such file " + StringTools.htmlEscape(param));
 				return;
 			}
 			var gnames = neko.vm.Module.readGlobalsNames(fp);
@@ -716,15 +716,15 @@ class Tora {
 			function hr( i : Int ){
 				return Math.round(i/1024)+"K";
 			}
-			neko.Lib.print("Report for " + m.name + " statics");
-			neko.Lib.print("<table>");
-			neko.Lib.print("<tr><th>Size</th><th>Name</th></tr>");
+			Sys.print("Report for " + m.name + " statics");
+			Sys.print("<table>");
+			Sys.print("<tr><th>Size</th><th>Name</th></tr>");
 			for( e in mem ){
-				neko.Lib.print("<tr><td>"+hr(e.size)+"</td><td>");
-				neko.Lib.print(StringTools.htmlEscape(Std.string(e.name)));
-				neko.Lib.print("</td></tr>");
+				Sys.print("<tr><td>"+hr(e.size)+"</td><td>");
+				Sys.print(StringTools.htmlEscape(Std.string(e.name)));
+				Sys.print("</td></tr>");
 			}
-			neko.Lib.print("</table>");
+			Sys.print("</table>");
 		default:
 			throw "No such command '"+cmd+"'";
 		}

@@ -4,7 +4,7 @@ class TestHandler extends tora.Handler<Msg> {
 	
 	override function onNotify( v : Msg ) {
 		if( v.n == 0 ) tora.Queue.get("test").stop();
-		neko.Lib.println(v.n+"#"+v.cl);
+		Sys.println(v.n+"#"+v.cl);
 	}
 	
 	override function onStop() {
@@ -86,14 +86,14 @@ class Test {
 		var params = neko.Web.getParams();
 		var q : tora.Queue<{ n : Int, cl : Int }> = tora.Queue.get("test");
 		if( params.exists("wait") ) {
-			neko.Lib.println("WAIT");
+			Sys.println("WAIT");
 			q.addHandler(new TestHandler());
 		} else {
 			var k = Std.random(1000);
 			var cl = Std.parseInt(neko.Web.getParams().get("client"));
 			//neko.Sys.sleep(0.05); // 50ms pause (network latency simul)
 			q.notify({ n : k, cl : cl });
-			neko.Lib.println("SEND "+k+" TO "+q.count()+" FROM #"+cl);
+			Sys.println("SEND "+k+" TO "+q.count()+" FROM #"+cl);
 		}
 
 	#end

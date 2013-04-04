@@ -12,7 +12,7 @@ class Handler<T> {
 	}
 	
 	public function sendData( d : String ) {
-		neko.Lib.print(d);
+		Sys.print(d);
 	}
 	
 }

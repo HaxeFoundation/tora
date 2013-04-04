@@ -19,7 +19,7 @@ import tora.Infos;
 class Admin {
 
 	static function w(str) {
-		neko.Lib.println(str);
+		Sys.println(str);
 	}
 
 	static function fmt( v : Float ) {
