@@ -19,7 +19,7 @@ import tora.Code;
 
 class Protocol {
 
-	var sock : #if neko neko.net.Socket #else flash.net.Socket #end;
+	var sock : #if neko sys.net.Socket #else flash.net.Socket #end;
 	var headers : Array<{ key : String, value : String }>;
 	var params : Array<{ key : String, value : String }>;
 	var uri : String;
@@ -31,7 +31,7 @@ class Protocol {
 	var tmpOut : haxe.io.BytesOutput;
 	#end
 
-	static var CODES : Array<Code> = Lambda.array(Lambda.map(Type.getEnumConstructs(Code),callback(Reflect.field,Code)));
+	static var CODES : Array<Code> = Lambda.array(Lambda.map(Type.getEnumConstructs(Code),Reflect.field.bind(Code)));
 
 	public function new( url : String ) {
 		headers = new Array();
@@ -88,8 +88,8 @@ class Protocol {
 		sock.addEventListener(flash.events.ProgressEvent.SOCKET_DATA,onSocketData);
 		sock.connect(host,port);
 		#elseif neko
-		sock = new neko.net.Socket();
-		sock.connect(new neko.net.Host(host),port);
+		sock = new sys.net.Socket();
+		sock.connect(new sys.net.Host(host),port);
 		sock.setFastSend(true);
 		onConnect(null);
 		#end

@@ -124,7 +124,7 @@ class Persist<T> {
 				var fields = new Array();
 				var raw = !stm;
 				for( f in a ) {
-					var t = processType(#if haxe_211 f.type #else f.t #end);
+					var t = processType(#if (haxe_211 || haxe3) f.type #else f.t #end);
 					if( t != PRaw ) raw = false;
 					fields.push({ name : f.name, t : t });
 				}
@@ -143,7 +143,7 @@ class Persist<T> {
 				case "Null": processType(pl.first());
 				default: throw "Unsupported type "+t;
 				}
-			case CAbstract(a,pl):
+			case CAbstract(a,_):
 				switch( a ) {
 				case "Int", "Float", "Bool": PRaw;
 				default: throw "Unsupported abstract "+a;
@@ -288,12 +288,12 @@ class Persist<T> {
 				l;
 			}
 			case PHashRaw: if( v == null ) null else {
-				var h = new Hash<Dynamic>();
+				var h = new Map<String,Dynamic>();
 				untyped h.h = v;
 				h;
 			}
 			case PHash(t): if( v == null ) null else {
-				var h = new Hash<Dynamic>();
+				var h = new Map<String,Dynamic>();
 				while( v != 0 ) {
 					untyped __dollar__hadd(h.h,v[0],wrap(v[1],t));
 					v = v[2];
@@ -301,12 +301,12 @@ class Persist<T> {
 				h;
 			}
 			case PIntHashRaw: if( v == null ) null else {
-				var h = new IntHash<Dynamic>();
+				var h = new Map<Int,Dynamic>();
 				untyped h.h = v;
 				h;
 			}
 			case PIntHash(t): if( v == null ) null else {
-				var h = new IntHash<Dynamic>();
+				var h = new Map<Int,Dynamic>();
 				while( v != 0 ) {
 					untyped __dollar__hadd(h.h,v[0],wrap(v[1],t));
 					v = v[2];
