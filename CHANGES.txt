@@ -1,4 +1,8 @@
-2013_02-24 : 1.8
+2013-04-04 : 1.8.1
+	more haxe3 changes
+	improved streaming of responses >128KB
+
+2013-02-24 : 1.8
 	haxe3 changes
 
 2012-04-30 : 1.7
