@@ -1,5 +1,7 @@
+-cp src
 -neko tora.n
 -main Tora
 --next
+-cp src
 -neko tora_admin.n
 -main Admin

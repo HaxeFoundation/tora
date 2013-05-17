@@ -1,0 +1,9 @@
+{
+  "name": "tora",
+  "url": "http://nekovm.org",
+  "license": "LGPL",
+  "description": "A multithreaded Neko application server",
+  "version": "1.8.1",
+  "releasenote": "See CHANGES.txt",
+  "contributors": ["ncannasse"]
+}

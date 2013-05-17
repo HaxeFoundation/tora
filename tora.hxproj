@@ -15,7 +15,7 @@
   </output>
   <!-- Other classes to be compiled into your SWF -->
   <classpaths>
-    <!-- example: <class path="..." /> -->
+    <class path="src" />
   </classpaths>
   <!-- Build options -->
   <build>
@@ -23,7 +23,7 @@
     <option flashStrict="False" />
     <option mainClass="Tora" />
     <option enabledebug="False" />
-    <option additional="--next&#xA;-neko tora_admin.n&#xA;-main Admin" />
+    <option additional="--next&#xA;-cp src&#xA;-neko tora_admin.n&#xA;-main Admin" />
   </build>
   <!-- haxelib libraries -->
   <haxelib>
@@ -43,6 +43,7 @@
     <hidden path="tora.hxml" />
     <hidden path="tora_admin.n" />
     <hidden path="tora.n" />
+    <hidden path="haxelib.json" />
   </hiddenPaths>
   <!-- Executed before build -->
   <preBuildCommand />
