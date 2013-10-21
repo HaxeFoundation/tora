@@ -48,6 +48,13 @@ typedef Timer = {
 	var repeat : Bool;
 }
 
+enum ToraMode {
+	TMRegular;
+	TMDebug;
+	TMUnsafe;
+	TMFastCGI;
+}
+
 class Tora {
 
 	var clientQueue : neko.vm.Deque<Client>;
@@ -530,7 +537,7 @@ class Tora {
 		}
 	}
 
-	function run( host : String, port : Int, secure : Bool, ?debug : Bool ) {
+	function run( host : String, port : Int, mode : ToraMode ) { // secure : Bool, ?debug : Bool ) {
 		var s = new sys.net.Socket();
 		try {
 			s.bind(new sys.net.Host(host),port);
@@ -541,10 +548,13 @@ class Tora {
 		try {
 			while( running ) {
 				var sock = s.accept();
-				if( debug )
-					debugQueue.add(new Client(sock, true));
-				else
-					handleRequest(new Client(sock,secure));
+				switch( mode )
+				{
+					case TMDebug:	debugQueue.add(new Client(sock, true));
+					case TMUnsafe:	handleRequest(new Client(sock, false));
+					case TMRegular:	handleRequest(new Client(sock, true));
+					case TMFastCGI: handleRequest(new fcgi.ClientFcgi(sock, true));
+				}
 			}
 		} catch( e : Dynamic ) {
 			log("accept() failure : maybe too much FD opened ?");
@@ -852,6 +862,7 @@ class Tora {
 		var nthreads = 32;
 		var i = 0;
 		var debugPort = null;
+		var fcgiMode = false;
 		// skip first argument for haxelib "run"
 		if( args[0] != null && StringTools.endsWith(args[0],"/") )
 			i++;
@@ -871,9 +882,14 @@ class Tora {
 				if( hp.length != 2 ) throw "Unsafe format should be host:port";
 				var port = Std.parseInt(hp[1]);
 				inst.ports.push(port);
-				unsafe.add({ host : hp[0], port : port });
+				unsafe.add( { host : hp[0], port : port } );
+			
 			case "-debugPort":
 				debugPort = Std.parseInt(value());
+			
+			case "-fcgi":
+				fcgiMode = true;
+			
 			default:
 				throw "Unknown argument "+kind;
 			}
@@ -883,14 +899,19 @@ class Tora {
 			log("Opening debug port on " + host + ":" + debugPort);
 			inst.debugQueue = new neko.vm.Deque();
 			inst.startup(1, inst.debugQueue);
-			neko.vm.Thread.create(inst.run.bind(host, debugPort, false, true));
+			neko.vm.Thread.create(inst.run.bind(host, debugPort, TMDebug));
 		}
 		for( u in unsafe ) {
 			log("Opening unsafe port on "+u.host+":"+u.port);
-			neko.vm.Thread.create(inst.run.bind(u.host,u.port,false, false));
+			neko.vm.Thread.create(inst.run.bind(u.host, u.port, TMUnsafe));
 		}
-		log("Starting Tora server on "+host+":"+port+" with "+nthreads+" threads");
-		inst.run(host,port,true);
+		log("Starting Tora server on " + host + ":" + port + " with " + nthreads + " threads");
+		
+		if ( fcgiMode )
+			inst.run(host, port, TMFastCGI);
+		else
+			inst.run(host, port, TMRegular);
+		
 		inst.stop();
 	}
 
