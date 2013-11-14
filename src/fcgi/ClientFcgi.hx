@@ -223,8 +223,7 @@ class ClientFcgi extends Client
 	{
 		var s = '';
 		if ( headersOut != null )
-			for ( k in headersOut )
-				s += k + NL;
+			s = headersOut.join(NL) + NL;
 		headersOut = null;
 		return s;
 	}
