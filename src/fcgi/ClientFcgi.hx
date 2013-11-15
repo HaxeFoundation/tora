@@ -32,7 +32,7 @@ class ClientFcgi extends Client
 	var dataIn : String;
 	
 	var statusOut : String;
-	var headersOut : StringMap<String>;
+	var headersOut : List<String>;
 	var stdOut : String;
 	
 	var statusSent : Bool;
@@ -114,8 +114,8 @@ class ClientFcgi extends Client
 			
 			case CHeaderKey: key = msg;
 			case CHeaderValue, CHeaderAddValue:
-				if ( headersOut == null ) headersOut = new StringMap();
-				headersOut.set(key, msg);
+				if ( headersOut == null ) headersOut = new List<String>();
+				headersOut.add(key + ':' + msg);
 			
 			case CPrint: if ( stdOut == null ) stdOut = ''; stdOut += msg;
 			
@@ -141,7 +141,7 @@ class ClientFcgi extends Client
 				throw msg;
 			
 			case CRedirect:
-				if ( headersOut == null ) headersOut = new StringMap(); headersOut.set('Location', msg);
+				if ( headersOut == null ) headersOut = new List<String>(); headersOut.add('Location:' + msg);
 				
 				var s = makeStatus("302") + makeHeaders() + NL;
 				
@@ -223,8 +223,7 @@ class ClientFcgi extends Client
 	{
 		var s = '';
 		if ( headersOut != null )
-			for ( k in headersOut.keys() )
-				s += k + ':' + headersOut.get(k) + NL;
+			s = headersOut.join(NL) + NL;
 		headersOut = null;
 		return s;
 	}
