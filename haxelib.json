@@ -3,7 +3,7 @@
   "url": "http://nekovm.org",
   "license": "LGPL",
   "description": "A multithreaded Neko application server",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "releasenote": "See CHANGES.txt",
   "contributors": ["ncannasse"]
 }

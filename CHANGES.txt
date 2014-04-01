@@ -1,3 +1,6 @@
+2014-04-01 : 1.8.2
+	added Protocol.onBytes
+
 2013-04-04 : 1.8.1
 	more haxe3 changes
 	improved streaming of responses >128KB
