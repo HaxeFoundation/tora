@@ -166,7 +166,7 @@ class ModNekoApi {
 					}
 			case CPartDone:
 			case CError:
-				throw buffer.readString(0,client.bytes);
+				throw buffer.getString(0,client.bytes);
 			default:
 				throw "Unexpected "+msg;
 			}
