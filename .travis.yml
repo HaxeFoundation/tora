@@ -1,0 +1,20 @@
+language: haxe
+
+os:
+  - linux
+  - osx
+
+haxe:
+  - "3.2.1"
+  - development
+
+install:
+  - haxelib dev tora .
+  - haxelib list
+
+script:
+  - haxe tora.hxml
+  - pushd test
+  -   haxe test.hxml
+  -   haxe all.hxml
+  - popd

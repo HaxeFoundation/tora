@@ -1,0 +1,12 @@
+# just type-check everything
+-neko check.n
+--no-output
+-cp ..
+-cp ../src
+--macro include('fcgi')
+--macro include('tora')
+Admin
+Client
+ModNekoApi
+ModToraApi
+Tora

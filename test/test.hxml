@@ -5,6 +5,6 @@
 
 --next
 # Flash
--swf9 test.swf
+-swf test.swf
 -main Test
 -cp ..
