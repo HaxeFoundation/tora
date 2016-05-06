@@ -55,7 +55,7 @@ class Api {
 		return neko.Lib.load(lib,"tora_get_url",3)(untyped host.__s,untyped uri.__s,params);
 	}
 
-	static var _ =  {
+	@:keep static var _ =  {
 		var v = Sys.getEnv("MOD_NEKO");
 		if( v == null || v == "1" )
 			v = "";
