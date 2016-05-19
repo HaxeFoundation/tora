@@ -331,7 +331,8 @@ class ClientFcgi extends Client
 								var hs = h.split("\r\n");
 								for ( s in hs )
 								{
-									if ( s.indexOf('Content-Disposition:') == 0 )
+									var content_diposition = s.substring(0, 19).toLowerCase();
+									if ( content_diposition == "content-disposition" )
 									{
 										p = s.indexOf('name=');
 										if ( p > 0 )
