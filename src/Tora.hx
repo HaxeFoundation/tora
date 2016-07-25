@@ -865,9 +865,9 @@ class Tora {
 		var i = 0;
 		var debugPort = null;
 		var fcgiMode = false;
-		// skip first argument for haxelib "run"
-		if( args[0] != null && StringTools.endsWith(args[0],"/") )
-			i++;
+		// skip last argument for haxelib "run"
+		if (Sys.getEnv("HAXELIB_RUN") == "1")
+			args.pop();
 		var unsafe = new List();
 		inst = new Tora();
 		while( true ) {
