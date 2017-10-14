@@ -1,0 +1,8 @@
+-lib utest
+-cp .
+-cp ../../
+-cp ../../src
+-lib hx3compat
+-main Main
+-neko unit-tests.n
+

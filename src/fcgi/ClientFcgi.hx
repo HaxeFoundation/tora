@@ -20,12 +20,12 @@ package fcgi;
 
 import fcgi.Message;
 import fcgi.StatusCode;
+import fcgi.MultipartParser;
 
 import haxe.ds.StringMap;
 import haxe.io.Bytes;
 
 import tora.Code;
-
 
 class ClientFcgi extends Client
 {
@@ -38,10 +38,12 @@ class ClientFcgi extends Client
 	
 	var fcgiParams : List<{ k : String, v : String }>;
 	
-	var isMultipart : Bool;
 	var contentType : String;
 	var contentLength : Int;
 	
+	var multipart : Null<MultipartParser>;
+	var eoin : Bool;
+
 	var dataIn : String;
 	
 	var statusOut : String;
@@ -50,9 +52,6 @@ class ClientFcgi extends Client
 	
 	var statusSent : Bool;
 	var bodyStarted : Bool;
-	
-	var multiparts : List<{name : String, file : String, data : String}>;
-	var fileMessages : List<{ code : Code, str : String }>;
 	
 	public function new(s,secure)
 	{
@@ -64,10 +63,12 @@ class ClientFcgi extends Client
 		
 		fcgiParams = new List();
 		
-		isMultipart = false;
 		contentType = null;
 		contentLength = null;
 		
+		multipart = null;
+		eoin = false;
+
 		dataIn = null;
 		
 		statusOut = null;
@@ -76,9 +77,6 @@ class ClientFcgi extends Client
 		
 		statusSent = false;
 		bodyStarted = false;
-		
-		multiparts = new List();
-		fileMessages = new List();
 	}
 	
 	override public function prepare( ) : Void
@@ -91,10 +89,12 @@ class ClientFcgi extends Client
 		
 		fcgiParams = new List();
 		
-		isMultipart = false;
 		contentType = null;
 		contentLength = null;
 		
+		multipart = null;
+		eoin = false;
+
 		dataIn = null;
 		
 		statusOut = null;
@@ -103,9 +103,6 @@ class ClientFcgi extends Client
 		
 		statusSent = false;
 		bodyStarted = false;
-		
-		multiparts = new List();
-		fileMessages = new List();
 	}
 	
 	override public function sendMessageSub( code : Code, msg : String, pos : Int, len : Int ) : Void
@@ -162,32 +159,9 @@ class ClientFcgi extends Client
 				MessageHelper.write(sock.output, requestId, END_REQUEST(202, REQUEST_COMPLETE));
 			
 			case CQueryMultipart:
-				if ( isMultipart )
-				{
-					var bufSize = Std.parseInt(msg);
-					
-					for ( m in multiparts )
-					{
-						if ( m.file != null ) fileMessages.add( { code: CPartFilename, str: m.file } );
-						fileMessages.add( { code: CPartKey, str: m.name } );
-						
-						if( m.data.length < bufSize )
-							fileMessages.add( { code: CPartData, str: m.data } );
-						else
-						{
-							var i = 0;
-							while ( i < m.data.length )
-							{
-								fileMessages.add( { code: CPartData, str: m.data.substr(i, bufSize) } );
-								i += bufSize;
-							}
-						}
-						
-						fileMessages.add( { code: CPartDone, str: null } );
-					}
-				}
-				fileMessages.add( { code: CExecute, str: null } );
-			
+				if (multipart != null)
+					multipart.outputSize = Std.parseInt(msg);
+
 			case CLog:
 				// save 2 file
 				//Tora.log('App log: ' + msg);
@@ -262,21 +236,23 @@ class ClientFcgi extends Client
 	
 	override public function readMessageBuffer( buf : Bytes ) : Code
 	{
-		if ( fileMessages.length > 0 )
-		{
-			var m = fileMessages.pop();
-			
-			if ( m.str != null )
-			{
-				bytes = m.str.length;
-				buf.blit(0, Bytes.ofString(m.str), 0, m.str.length);
+		if (multipart != null) {
+			var next = multipart.read();
+			while (!eoin && next == null) {
+				while (!processMessage()) {}
+				next = multipart.read();
 			}
-			
-			return m.code;
+			if (next != null) {
+				if (next.buffer != null) {
+					bytes = next.length;
+					buf.blit(0, Bytes.ofData(neko.NativeString.ofString(next.buffer)), next.start, bytes);
+				}
+				return next.code;
+			}
 		}
-		
-		return super.readMessageBuffer(buf);
+		return null;
 	}
+
 	override public function processMessage( ) : Bool
 	{
 		var m = MessageHelper.read(sock.input);
@@ -299,79 +275,28 @@ class ClientFcgi extends Client
 				// This is truly a response from the application, not a low-level acknowledgement from the FastCGI library.
 				MessageHelper.write(sock.output, requestId, END_REQUEST(202, REQUEST_COMPLETE));
 				this.execute = false;
-			
+
+			case STDIN(s) if (multipart != null):
+				if (s == "")
+					eoin = true;
+				multipart.feed(s);
+				execute = true;
+				return true;
+
+			case STDIN(s) if (s == ""):
+				for (p in getParamValues(getParams, true))
+					params.push(p);
+				for (p in getParamValues(postData, false))
+					params.push(p);
+				eoin = true;
+				execute = true;
+				return true;
+
 			case STDIN(s):
-				if ( s == "" )
-				{
-					for ( p in getParamValues(getParams, true) ) params.push(p);
-					
-					if ( !isMultipart )
-					{
-						for ( p in getParamValues(postData, false) ) params.push(p);
-					}
-					else
-					{
-						var pos = contentType.indexOf('boundary=');
-						if ( pos != null )
-						{
-							pos += 9; //boundary=
-							var boundary = '--' + contentType.substr(pos);
-							var parts = postData.split(boundary);
-							for ( part in parts )
-							{
-								if ( part == '' ) continue;
-								if ( part.substr(0, 2) == '--' ) break;
-								
-								var p = part.indexOf("\r\n\r\n");
-								var h = part.substr(0 + 2, p - 2); // \r\n
-								var data = part.substr(p + 4, part.length - p - 4 - 2); // \r\n
-								
-								var name : String = null;
-								var file : String = null;
-								var hs = h.split("\r\n");
-								for ( s in hs )
-								{
-									if ( s.indexOf('Content-Disposition:') == 0 )
-									{
-										p = s.indexOf('name=');
-										if ( p > 0 )
-										{
-											p += 5;
-											var c : String = s.charAt(p++);
-											name = s.substring(p, s.indexOf(c, p));
-										}
-										
-										p = s.indexOf('filename=');
-										if( p > 0 )
-										{
-											p += 9;
-											var c : String = s.charAt(p++);
-											file = s.substring(p, s.indexOf(c, p));
-										}
-									}
-								}
-								
-								if ( name == null )
-									continue;
-								
-								multiparts.add({
-									name: name,
-									file: file,
-									data: data
-								});
-							}
-						}
-					}
-/*CTestConnect*/	
-/*CHostResolve*/	
-/*CError*/			
-/*CExecute*/
-					execute = true;
-					return true;
-				}
-				if ( postData == null ) postData = '';
+				if (postData == null)
+					postData = '';
 /*CPostData*/	postData += s;
-			
+
 			case DATA(s): // not implimented @ nginx
 				// FCGI_DATA is a second stream record type used to send additional data to the application.
 				if ( s == "" )
@@ -408,8 +333,12 @@ class ClientFcgi extends Client
 						if ( value == null || value.length < 1 ) continue;
 						
 						contentType = value;
-						isMultipart = contentType.indexOf('multipart/form-data') > -1;
-						
+
+						if (contentType.indexOf('multipart/form-data') > -1) {
+							var pos = contentType.indexOf('boundary=');
+							var boundary = pos < 0 ? null : "--" + contentType.substr(pos + 9);
+							multipart = new MultipartParser(boundary);
+						}
 					}
 					else if ( name == 'CONTENT_LENGTH' ) 
 					{
