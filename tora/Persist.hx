@@ -87,13 +87,13 @@ class Persist<T> {
 			case CClass(c,pl):
 				switch( c ) {
 				case "Array":
-					var t = processType(pl.first());
+					var t = processType(firstCTypeParam(pl));
 					if( t == PRaw && !stm )
 						PArrayRaw;
 					else
 						PArray(t);
 				case "List":
-					var t = processType(pl.first());
+					var t = processType(firstCTypeParam(pl));
 					if( t == PRaw && !stm )
 						PListRaw;
 					else
@@ -103,19 +103,19 @@ class Persist<T> {
 				case "Int", "Float", "neko.NativeString": PRaw;
 				case "haxe.io.Bytes": if( stm ) PBytesCopy else PBytes;
 				case "neko.NativeArray":
-					var t = processType(pl.first());
+					var t = processType(firstCTypeParam(pl));
 					if( t == PRaw && !stm )
 						PRaw;
 					else
 						PNativeArray(t);
 				case "Hash":
-					var t = processType(pl.first());
+					var t = processType(firstCTypeParam(pl));
 					if( t == PRaw && !stm )
 						PHashRaw;
 					else
 						PHash(t);
 				case "IntHash":
-					var t = processType(pl.first());
+					var t = processType(firstCTypeParam(pl));
 					if( t == PRaw && !stm )
 						PIntHashRaw;
 					else
@@ -137,12 +137,12 @@ class Persist<T> {
 					case "SId", "SInt", "SUInt", "SBigId", "SBigInt", "SFloatLow", "SFloat", "SBool", "SEncoded", "SColor": PRaw;
 					case "SString","STinyText","SSmallText", "SText", "SSmallBinary", "SBinary", "SLongBinary": PString;
 					case "SDate","SDateTime": PDate;
-					case "SNull": processType(pl.first());
+					case "SNull": processType(firstCTypeParam(pl));
 					default:
 						throw "Unsupported type "+t;
 					}
 				} else switch( t ) {
-				case "Null": processType(pl.first());
+				case "Null": processType(firstCTypeParam(pl));
 				default: throw "Unsupported type "+t;
 				}
 			case CAbstract(a,_):
@@ -318,4 +318,11 @@ class Persist<T> {
 		};
 	}
 
+#if (haxe_ver >= 4)
+	static inline function firstCTypeParam(params:Array<haxe.rtti.CType>)
+		return params[0];
+#else
+	static inline function firstCTypeParam(params:List<haxe.rtti.CType>)
+		return params.first();
+#end
 }
