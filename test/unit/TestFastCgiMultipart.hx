@@ -169,5 +169,20 @@ class TestFastCgiMultipart {
 		m.feed('--foo--');
 		Assert.raises(m.read, String);
 	}
+
+	public function test_malformed_boundary_lines()
+	{
+		var m = new MultipartParser("--foo");
+		m.feed('--foo\r\nContent-Disposition: form-data; name="foo"\r\n\r\nbar\r\n');
+		m.feed('--foo  ');  // not a boundary *line*
+		Assert.same({ code:CPartKey, data:"foo" }, s(m.read()));
+		Assert.same({ code:CPartData, data:"bar" }, s(m.read()));
+		Assert.same({ code:CPartDone, data:null }, s(m.read()));
+		Assert.raises(m.read, String);
+
+		var m = new MultipartParser("--foo");
+		m.feed('--foo  ');  // not a boundary *line*
+		Assert.raises(m.read, String);
+	}
 }
 

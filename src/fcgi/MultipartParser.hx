@@ -126,13 +126,18 @@ class MultipartParser {
 				pos = b + boundary.length;  // jump over boundary but not \r\n (or, possibly, --)
 				state = MAtBoundary;
 			case MAtBoundary if (pos + 2 <= buf.length):  // buf must have room for \r\n or --
-				if (bufMatches("--", pos)) {
+				if (bufMatches("\r\n", pos)) {
+					pos += 2;  // jump over \r\n
+					state = MPartReadingHeaders;
+				} else if (bufMatches("--", pos)) {
 					buf = null;
 					pos = 0;
 					state = MFinished;
 				} else {
-					pos += 2;  // jump over \r\n
-					state = MPartReadingHeaders;
+					// the boundary delimiter MUST NOT appear inside any of the
+					// encapsulated parts, on a line by itself or as the prefix of any
+					// line (RFC 2046); we impose that MBeforeFirstBoundary as well
+					throw "Boundary delimiter not followed by either \\r\\n or --";
 				}
 			case MPartReadingHeaders:
 				var b = buf.indexOf("\r\n\r\n", pos);
