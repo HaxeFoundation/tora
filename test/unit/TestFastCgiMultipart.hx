@@ -184,5 +184,16 @@ class TestFastCgiMultipart {
 		m.feed('--foo  ');  // not a boundary *line*
 		Assert.raises(m.read, String);
 	}
+
+	public function test_missing_content_disposition_or_part_name()
+	{
+		var m = new MultipartParser("--foo");
+		m.feed('--foo\r\nContent-Type: bar\r\n\r\n');
+		Assert.raises(m.read, String);
+
+		var m = new MultipartParser("--foo");
+		m.feed('--foo\r\nContent-Disposition: form-data;\r\n\r\n');
+		Assert.raises(m.read, String);
+	}
 }
 
