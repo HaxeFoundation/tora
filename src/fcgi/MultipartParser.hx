@@ -152,8 +152,9 @@ class MultipartParser {
 					var eq = buf.indexOf("=", pos);
 					if (eq >= 8 && bufMatches("filename", eq - 8))
 						filename = readFieldValue(CPartFilename, eq + 1, b);  // updates pos
-					else if (eq >= 8 && bufMatches("name", eq - 4))
+					else if (eq >= 4 && bufMatches("name", eq - 4)) {
 						name = readFieldValue(CPartKey, eq + 1, b);  // updates pos
+					}
 					else if (eq >= 0)
 						pos = eq + 1;  // jump over =
 					else
