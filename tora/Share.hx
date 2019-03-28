@@ -18,9 +18,11 @@
 */
 package tora;
 
+private typedef Handle = Dynamic;
+
 class Share<T> {
 
-	var s : Dynamic;
+	var s : Handle;
 	var p : Persist<T>;
 	public var name(default,null) : String;
 
@@ -73,11 +75,11 @@ class Share<T> {
 		share_commit_all = neko.Lib.load(Api.lib,"share_commit_all",0);
 	}
 
-	static var share_init = null;
-	static var share_get;
-	static var share_set;
-	static var share_commit;
-	static var share_free;
-	static var share_commit_all;
+	static var share_init : neko.NativeString  -> ?(Void -> Dynamic) -> Handle = null;
+	static var share_get : Handle -> Bool -> Dynamic;
+	static var share_set : Handle -> Dynamic -> Void;
+	static var share_commit : Handle -> Void;
+	static var share_free : Handle -> Void;
+	static var share_commit_all : Void -> Void;
 
 }

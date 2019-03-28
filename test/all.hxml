@@ -3,6 +3,7 @@
 --no-output
 -cp ..
 -cp ../src
+-lib hx3compat
 --macro include('fcgi')
 --macro include('tora')
 Admin
