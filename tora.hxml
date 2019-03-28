@@ -1,6 +1,7 @@
 -cp src
 -neko tora.n
 -main Tora
+-lib hx3compat
 --next
 -cp src
 -neko tora_admin.n

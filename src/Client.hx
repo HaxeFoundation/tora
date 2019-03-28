@@ -16,6 +16,12 @@
 	License along with this library; if not, write to the Free Software
 	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#if (haxe_ver >= 4)
+import sys.thread.Mutex;
+#else
+import neko.vm.Mutex;
+#end
+
 import tora.Code;
 import ModToraApi.Queue;
 import ModToraApi.Share;
@@ -50,7 +56,7 @@ class Client {
 	public var queues : List<Queue>;
 	public var waitingShare : Share;
 	public var lockedShares : List<Share>;
-	public var writeLock : neko.vm.Mutex;
+	public var writeLock : Mutex;
 	public var needClose : Bool;
 	public var closed : Bool;
 	public var inSocketList : Bool;

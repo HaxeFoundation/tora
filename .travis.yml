@@ -10,6 +10,7 @@ haxe:
 
 install:
   - haxelib dev tora .
+  - haxelib install --always tora.hxml
   - haxelib list
 
 script:

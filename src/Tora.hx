@@ -16,18 +16,32 @@
 	License along with this library; if not, write to the Free Software
 	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#if (haxe_ver >= 4)
+import sys.thread.Deque;
+import sys.thread.Lock;
+import sys.thread.Mutex;
+import sys.thread.Thread;
+import sys.thread.Tls;
+#else
+import neko.vm.Deque;
+import neko.vm.Lock;
+import neko.vm.Mutex;
+import neko.vm.Thread;
+import neko.vm.Tls;
+#end
+
 import tora.Code;
 import tora.Infos;
 
 typedef ThreadData = {
 	var id : Int;
-	var t : neko.vm.Thread;
+	var t : Thread;
 	var client : Client;
 	var time : Float;
 	var hits : Int;
 	var errors : Int;
 	var stopped : Bool;
-	var queue : neko.vm.Deque<Client>;
+	var queue : Deque<Client>;
 }
 
 typedef FileData = {
@@ -37,7 +51,7 @@ typedef FileData = {
 	var cacheHits : Int;
 	var bytes : Float;
 	var time : Float;
-	var lock : neko.vm.Mutex;
+	var lock : Mutex;
 	var cache : haxe.ds.GenericStack<ModToraApi>;
 	var cron : Timer;
 	var toClean : List<Client>;
@@ -59,16 +73,16 @@ enum ToraMode {
 
 class Tora {
 
-	var clientQueue : neko.vm.Deque<Client>;
-	var debugQueue : neko.vm.Deque<Client>;
-	var pendingSocks : neko.vm.Deque<Client>;
+	var clientQueue : Deque<Client>;
+	var debugQueue : Deque<Client>;
+	var pendingSocks : Deque<Client>;
 	var threads : Array<ThreadData>;
 	var startTime : Float;
 	var totalHits : Int;
 	var recentHits : Int;
 	var activeConnections : Int;
 	var files : Map<String,FileData>;
-	var flock : neko.vm.Mutex;
+	var flock : Mutex;
 	var rootLoader : neko.vm.Loader;
 	var modulePath : Array<String>;
 	var redirect : Dynamic;
@@ -78,10 +92,10 @@ class Tora {
 	var jit : Bool;
 	var hosts : Map<String,String>;
 	var ports : Array<Int>;
-	var tls : neko.vm.Tls<ThreadData>;
+	var tls : Tls<ThreadData>;
 	var delayQueue : List<Timer>;
-	var delayWait : neko.vm.Lock;
-	var delayLock : neko.vm.Mutex;
+	var delayWait : Lock;
+	var delayLock : Mutex;
 
 	function new() {
 		totalHits = 0;
@@ -91,16 +105,16 @@ class Tora {
 		files = new Map();
 		hosts = new Map();
 		ports = new Array();
-		tls = new neko.vm.Tls();
-		flock = new neko.vm.Mutex();
-		clientQueue = new neko.vm.Deque();
-		pendingSocks = new neko.vm.Deque();
+		tls = new Tls();
+		flock = new Mutex();
+		clientQueue = new Deque();
+		pendingSocks = new Deque();
 		threads = new Array();
 		rootLoader = neko.vm.Loader.local();
 		modulePath = rootLoader.getPath();
 		delayQueue = new List();
-		delayWait = new neko.vm.Lock();
-		delayLock = new neko.vm.Mutex();
+		delayWait = new Lock();
+		delayLock = new Mutex();
 	}
 
 	function init( nthreads : Int ) {
@@ -109,9 +123,9 @@ class Tora {
 		set_trusted = neko.Lib.load("std","set_trusted",1);
 		enable_jit = neko.Lib.load("std","enable_jit",1);
 		jit = (enable_jit(null) == true);
-		neko.vm.Thread.create(startup.bind(nthreads,clientQueue));
-		neko.vm.Thread.create(socketsLoop);
-		neko.vm.Thread.create(speedDelayLoop);
+		Thread.create(startup.bind(nthreads,clientQueue));
+		Thread.create(socketsLoop);
+		Thread.create(speedDelayLoop);
 	}
 
 	function startup( nthreads : Int, queue ) {
@@ -135,7 +149,7 @@ class Tora {
 				stopped : false,
 				queue : queue,
 			};
-			inf.t = neko.vm.Thread.create(threadLoop.bind(inf));
+			inf.t = Thread.create(threadLoop.bind(inf));
 			threads.push(inf);
 		}
 	}
@@ -379,7 +393,7 @@ class Tora {
 				filetime : 0.,
 				loads : 0,
 				cacheHits : 0,
-				lock : new neko.vm.Mutex(),
+				lock : new Mutex(),
 				cache : new haxe.ds.GenericStack<ModToraApi>(),
 				bytes : 0.,
 				time : 0.,
@@ -899,13 +913,13 @@ class Tora {
 		inst.init(nthreads);
 		if( debugPort != null ) {
 			log("Opening debug port on " + host + ":" + debugPort);
-			inst.debugQueue = new neko.vm.Deque();
+			inst.debugQueue = new Deque();
 			inst.startup(1, inst.debugQueue);
-			neko.vm.Thread.create(inst.run.bind(host, debugPort, TMDebug));
+			Thread.create(inst.run.bind(host, debugPort, TMDebug));
 		}
 		for( u in unsafe ) {
 			log("Opening unsafe port on "+u.host+":"+u.port);
-			neko.vm.Thread.create(inst.run.bind(u.host, u.port, TMUnsafe));
+			Thread.create(inst.run.bind(u.host, u.port, TMUnsafe));
 		}
 		log("Starting Tora server on " + host + ":" + port + " with " + nthreads + " threads");
 		

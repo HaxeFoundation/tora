@@ -18,9 +18,11 @@
 */
 package tora;
 
+private typedef Handle = Dynamic;
+
 class Queue<T> {
 
-	var q : Dynamic;
+	var q : Handle;
 	public var name(default,null) : String;
 
 	function new() {
@@ -56,9 +58,9 @@ class Queue<T> {
 		return q;
 	}
 
-	static var queue_init;
-	static var queue_add_handler;
-	static var queue_notify;
-	static var queue_count;
-	static var queue_stop;
+	static var queue_init : neko.NativeString -> Handle;
+	static var queue_add_handler : Handle -> {} -> Void;
+	static var queue_notify : Handle -> Dynamic -> Void;
+	static var queue_count : Handle -> Int;
+	static var queue_stop : Handle -> Void;
 }

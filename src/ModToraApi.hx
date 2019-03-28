@@ -16,17 +16,25 @@
 	License along with this library; if not, write to the Free Software
 	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#if (haxe_ver >= 4)
+import sys.thread.Lock;
+import sys.thread.Mutex;
+#else
+import neko.vm.Lock;
+import neko.vm.Mutex;
+#end
+
 typedef Share = {
 	var name : String;
 	var data : Dynamic;
-	var lock : neko.vm.Mutex;
+	var lock : Mutex;
 	var owner : Client;
 	var free : Bool;
 }
 
 typedef Queue = {
 	var name : String;
-	var lock : neko.vm.Mutex;
+	var lock : Mutex;
 	var clients : List<{ c : Client, h : Dynamic, cl : String }>;
 }
 
@@ -172,7 +180,7 @@ class ModToraApi extends ModNekoApi {
 			return h.elt.module.exportsTable();
 		// slow path : make an async request on /
 		var c = new NullClient(file, host, "/");
-		var lock = new neko.vm.Lock();
+		var lock = new Lock();
 		var usedApi = null;
 		c.onRequestDone = function(api) {
 			usedApi = api;
@@ -191,7 +199,7 @@ class ModToraApi extends ModNekoApi {
 		c.outBuf = new StringBuf();
 		for( p in params.keys() )
 			c.params.add( { k : Std.string(untyped p.__s), v : Std.string(untyped params.get(p).__s) } );
-		var lock = new neko.vm.Lock();
+		var lock = new Lock();
 		c.onRequestDone = function(_) {
 			lock.release();
 		};
@@ -205,7 +213,7 @@ class ModToraApi extends ModNekoApi {
 	// shares
 
 	public static var shares = new Map<String,Share>();
-	public static var shares_lock = new neko.vm.Mutex();
+	public static var shares_lock = new Mutex();
 
 	function share_init( name : neko.NativeString, ?make : Void -> Dynamic ) : Share {
 		var name = neko.NativeString.toString(name);
@@ -220,7 +228,7 @@ class ModToraApi extends ModNekoApi {
 				s = {
 					name : name,
 					data : try make() catch( e : Dynamic ) { shares_lock.release(); neko.Lib.rethrow(e); },
-					lock : new neko.vm.Mutex(),
+					lock : new Mutex(),
 					owner : null,
 					free : false,
 				};
@@ -289,7 +297,7 @@ class ModToraApi extends ModNekoApi {
 	// queues
 
 	static var queues = new Map<String,Queue>();
-	static var queues_lock = new neko.vm.Mutex();
+	static var queues_lock = new Mutex();
 
 	function queue_init( name : neko.NativeString ) : Queue {
 		var name = neko.NativeString.toString(name);
@@ -298,7 +306,7 @@ class ModToraApi extends ModNekoApi {
 		if( q == null ) {
 			q = {
 				name : name,
-				lock : new neko.vm.Mutex(),
+				lock : new Mutex(),
 				clients : new List(),
 			};
 			queues.set(name,q);
@@ -315,7 +323,7 @@ class ModToraApi extends ModNekoApi {
 		cl = Std.string(cl); // use our local String class
 		new ModuleContext(this).resetHandler({ h : h });
 		if( client.writeLock == null )
-			client.writeLock = new neko.vm.Mutex();
+			client.writeLock = new Mutex();
 		if( client.queues == null )
 			client.queues = new List();
 		client.writeLock.acquire();
