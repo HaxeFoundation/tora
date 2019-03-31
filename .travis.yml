@@ -11,6 +11,7 @@ haxe:
 install:
   - haxelib dev tora .
   - haxelib install --always tora.hxml
+  - haxelib install --always test/unit/unit.hxml
   - haxelib list
 
 script:
@@ -18,4 +19,8 @@ script:
   - pushd test
   -   haxe test.hxml
   -   haxe all.hxml
+  -   pushd unit
+  -     haxe unit.hxml
+  -     neko unit-tests.n
+  -   popd
   - popd
