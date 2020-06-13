@@ -250,7 +250,7 @@ class ClientFcgi extends Client
 				return next.code;
 			}
 		}
-		return null;
+		return CExecute;
 	}
 
 	override public function processMessage( ) : Bool
