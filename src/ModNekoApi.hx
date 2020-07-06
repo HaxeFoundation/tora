@@ -97,6 +97,12 @@ class ModNekoApi {
 		addHeader(h,CHeaderKey,NativeString.toString(header));
 		addHeader(h,CHeaderValue,NativeString.toString(value));
 	}
+  
+	function add_header( header : NativeString, value : NativeString ) {
+		var h = NativeString.toString(header);
+		addHeader(h,CHeaderKey,NativeString.toString(header));
+		addHeader(h,CHeaderAddValue,NativeString.toString(value));
+	}
 
 	function get_cookies() {
 		var v : Dynamic = null;
